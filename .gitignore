@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+config.ini
+journaux/*
+rapports/*
+modeles_enregistres/*
+entrees/historique/*
+entrees/traites/*
+!**/.gitkeep

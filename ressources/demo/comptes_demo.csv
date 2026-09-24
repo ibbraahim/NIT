@@ -1,0 +1,5 @@
+identifiant;nom;prenom;email;role;mot_de_passe
+admin;Administrateur;Compte;admin@demo.local;administrateur;Admin2026!
+planif;Benali;Sara;planif@demo.local;planificateur;Planif2026!
+resp;El Idrissi;Karim;resp@demo.local;responsable;Resp2026!
+direction;Tazi;Nadia;direction@demo.local;direction;Direction2026!
