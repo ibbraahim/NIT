@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from tkinter import ttk
 
+import matplotlib.dates as mdates
+
 from app.gui.style import COULEURS
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
@@ -86,7 +88,7 @@ class VuePrevisions(Vue):
             style="Section.TLabel",
         ).pack(anchor="w", pady=(10, 4))
         self.graphique = GraphiqueIntegre(self.contenu, largeur=9, hauteur=3.2)
-        self.graphique.pack(fill="x")
+        self.graphique.pack(fill="both", expand=True)
 
     def actualiser(self) -> None:
         sites = self.executer(lambda: admin.lister_sites(self.ctx)) or []
@@ -172,6 +174,8 @@ class VuePrevisions(Vue):
                 )
             axe.set_ylabel("Heures nécessaires")
             axe.legend(fontsize=8, loc="upper left")
+            axe.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=10))
+            axe.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
             axe.tick_params(axis="x", rotation=30)
 
         self.graphique.dessiner(_dessiner)
