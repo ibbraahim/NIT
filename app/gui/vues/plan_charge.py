@@ -64,8 +64,37 @@ class VuePlanCharge(Vue):
         self.label_commentaire = ttk.Label(statut, text="", style="Aide.TLabel", wraplength=700)
         self.label_commentaire.pack(side="left", padx=(12, 0))
 
-        self.cadre_grille = ttk.Frame(self.contenu, style="Carte.TFrame", padding=8)
-        self.cadre_grille.pack(fill="both", expand=True, pady=(4, 8))
+        zone_grille = ttk.Frame(self.contenu)
+        zone_grille.pack(fill="both", expand=True, pady=(4, 8))
+        self._canevas_grille = tk.Canvas(
+            zone_grille, highlightthickness=0, background=COULEURS["surface"]
+        )
+        ascenseur_h = ttk.Scrollbar(
+            zone_grille, orient="horizontal", command=self._canevas_grille.xview
+        )
+        self._canevas_grille.configure(xscrollcommand=ascenseur_h.set)
+        self._canevas_grille.pack(side="top", fill="both", expand=True)
+        ascenseur_h.pack(side="bottom", fill="x")
+
+        self.cadre_grille = ttk.Frame(self._canevas_grille, style="Carte.TFrame", padding=8)
+        self._canevas_grille.create_window((0, 0), window=self.cadre_grille, anchor="nw")
+
+        def _grille_a_jour(_evenement=None) -> None:
+            self._canevas_grille.configure(scrollregion=self._canevas_grille.bbox("all"))
+            self._canevas_grille.configure(height=self.cadre_grille.winfo_reqheight())
+
+        self.cadre_grille.bind("<Configure>", _grille_a_jour)
+
+        def _molette_horizontale(evenement) -> None:
+            self._canevas_grille.xview_scroll(int(-1 * (evenement.delta / 120)), "units")
+
+        self._canevas_grille.bind(
+            "<Enter>",
+            lambda _e: self._canevas_grille.bind_all("<Shift-MouseWheel>", _molette_horizontale),
+        )
+        self._canevas_grille.bind(
+            "<Leave>", lambda _e: self._canevas_grille.unbind_all("<Shift-MouseWheel>")
+        )
 
         barre = ttk.Frame(self.contenu)
         barre.pack(fill="x")
