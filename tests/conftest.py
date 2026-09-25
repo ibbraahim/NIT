@@ -128,6 +128,7 @@ MODULES_AVEC_DIALOGUES = [
     "app.gui.vues.plan_charge",
     "app.gui.vues.comparaison",
     "app.gui.vues.kpi_cibles",
+    "app.gui.vues.alertes",
     "app.gui.widgets.resultat_import",
 ]
 

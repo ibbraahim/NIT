@@ -81,6 +81,21 @@ class DepotPlansCharge(Depot):
             (plan_id,),
         )
 
+    def lignes_validees_periode(
+        self, site_id: int, zone_id: int | None, debut: date, fin: date
+    ) -> list[dict]:
+        """Lignes des plans validés du site sur une période (UC18 : détection des alertes de
+        sous-effectif, de sureffectif et de pénurie d'équipements)."""
+        return self._tous(
+            f"""SELECT {COLONNES_LIGNE} FROM plans_charge_lignes l
+                JOIN plans_charge p ON p.id = l.plan_id
+                JOIN zones z ON z.id = l.zone_id
+                WHERE p.site_id = %s AND p.statut = 'valide'
+                  AND (%s::int IS NULL OR l.zone_id = %s) AND l.date_jour BETWEEN %s AND %s
+                ORDER BY z.id, l.date_jour""",
+            (site_id, zone_id, zone_id, debut, fin),
+        )
+
     def remplacer_lignes(self, plan_id: int, lignes: list[dict]) -> int:
         """Remplace toutes les lignes du plan (utilisé par « Proposer le plan »)."""
         self._executer("DELETE FROM plans_charge_lignes WHERE plan_id = %s", (plan_id,))

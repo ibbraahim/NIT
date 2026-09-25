@@ -68,3 +68,41 @@ class DepotAlertes(Depot):
                 ORDER BY (a.niveau = 'rouge') DESC, a.date_maj DESC""",
             (site_id, type_alerte, type_alerte),
         )
+
+    def lister(
+        self, site_id: int, statut: str | None = None, type_alerte: str | None = None
+    ) -> list[dict]:
+        """Toutes les alertes d'un site (écran Alertes, UC19), y compris résolues."""
+        return self._tous(
+            f"""SELECT {COLONNES}, a.assigne_a, a.pris_en_charge_par, a.resolu_par,
+                       a.action_menee, a.date_prise_en_charge, a.date_resolution
+                {_DE}
+                WHERE a.site_id = %s AND (%s::text IS NULL OR a.statut = %s)
+                  AND (%s::text IS NULL OR a.type = %s)
+                ORDER BY (a.statut <> 'resolue') DESC, (a.niveau = 'rouge') DESC, a.date_maj DESC""",
+            (site_id, statut, statut, type_alerte, type_alerte),
+        )
+
+    def alerte(self, alerte_id: int) -> dict | None:
+        return self._un(
+            f"""SELECT {COLONNES}, a.assigne_a, a.pris_en_charge_par, a.resolu_par,
+                       a.action_menee, a.date_prise_en_charge, a.date_resolution
+                {_DE} WHERE a.id = %s""",
+            (alerte_id,),
+        )
+
+    def prendre_en_charge(self, alerte_id: int, utilisateur_id: int | None) -> None:
+        self._executer(
+            """UPDATE alertes SET statut = 'en_cours', assigne_a = %s, pris_en_charge_par = %s,
+                   date_prise_en_charge = now(), date_maj = now()
+               WHERE id = %s""",
+            (utilisateur_id, utilisateur_id, alerte_id),
+        )
+
+    def resoudre(self, alerte_id: int, utilisateur_id: int | None, action_menee: str) -> None:
+        self._executer(
+            """UPDATE alertes SET statut = 'resolue', resolu_par = %s, action_menee = %s,
+                   date_resolution = now(), date_maj = now()
+               WHERE id = %s""",
+            (utilisateur_id, action_menee, alerte_id),
+        )

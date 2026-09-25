@@ -11,7 +11,9 @@
 - modèles entraînés pour chaque zone et régression linéaire retenue par défaut pour le plan
   de charge (voir docs/plan.md, Q3 et Q4, pour les choix documentés) ;
 - rétro-prévisions et rapprochement réel/prévu sur la période de test des modèles (UC20),
-  matière des KPI de précision et de la détection de dérive (UC21 — voir docs/plan.md, Q5).
+  matière des KPI de précision et de la détection de dérive (UC21 — voir docs/plan.md, Q5) ;
+- KPI hebdomadaires calculés et alertes détectées sur le plan validé (UC16-UC18) : sureffectif
+  du mardi suivant, pénurie d'équipements de la zone Réception, seuils de KPI dépassés.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ from app.contexte import Contexte
 from app.journal import journal
 from app.ml import prediction, preparation
 from app.ml.entrainement import METHODES
-from app.services import comparaison, modeles, planification
+from app.services import alertes, comparaison, kpi, modeles, planification
 from app.services.auth import hacher_mot_de_passe
 from app.services.donnees import HORIZON_PREVISION_JOURS
 from app.services.planification import TAILLE_FENETRE_MOBILE
@@ -634,3 +636,9 @@ def generer_previsions_et_plans_demo(
             planification.enregistrer_brouillon_plan(ctx_planif, resultat["plan_id"], ajustements)
         planification.soumettre_plan(ctx_planif, resultat["plan_id"])
         planification.valider_plan(ctx_resp, resultat["plan_id"])
+
+    # UC16/17 puis UC18 : matière (statuts orange/rouge) pour les alertes de seuil de KPI, en
+    # plus de celles déjà décelables sur le plan validé (sous-effectif, sureffectif, pénurie
+    # d'équipements).
+    kpi.comparer_kpi_cibles(ctx_resp, site_id, None, "semaine", date_reference)
+    alertes.emettre_alertes(ctx_resp, site_id, date_reference)
