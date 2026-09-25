@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from tkinter import ttk
 
+from app.gui.style import COULEURS
 from app.gui.widgets.dialogues import executer_action
 
 
 class Vue(ttk.Frame):
-    """Écran affiché dans la zone de contenu de la fenêtre principale."""
+    """Écran affiché dans la zone de contenu de la fenêtre principale.
+
+    Le contenu (``self.contenu``) défile verticalement sans limite : les écrans dont les
+    éléments dépassent la hauteur visible restent entièrement accessibles à la molette ou
+    à l'ascenseur, plutôt que d'être comprimés ou coupés.
+    """
 
     titre = ""
     sous_titre = ""
@@ -25,8 +32,33 @@ class Vue(ttk.Frame):
                 side="left", padx=(12, 0), pady=(6, 0)
             )
         self.entete = entete
-        self.contenu = ttk.Frame(self)
-        self.contenu.pack(fill="both", expand=True)
+
+        cadre_defilant = ttk.Frame(self)
+        cadre_defilant.pack(fill="both", expand=True)
+        canevas = tk.Canvas(cadre_defilant, highlightthickness=0, background=COULEURS["fond"])
+        ascenseur = ttk.Scrollbar(cadre_defilant, orient="vertical", command=canevas.yview)
+        canevas.configure(yscrollcommand=ascenseur.set)
+        ascenseur.pack(side="right", fill="y")
+        canevas.pack(side="left", fill="both", expand=True)
+
+        self.contenu = ttk.Frame(canevas)
+        fenetre = canevas.create_window((0, 0), window=self.contenu, anchor="nw")
+
+        def _region_a_jour(_evenement=None) -> None:
+            canevas.configure(scrollregion=canevas.bbox("all"))
+
+        def _largeur_a_jour(evenement) -> None:
+            canevas.itemconfigure(fenetre, width=evenement.width)
+
+        self.contenu.bind("<Configure>", _region_a_jour)
+        canevas.bind("<Configure>", _largeur_a_jour)
+
+        def _molette(evenement) -> None:
+            canevas.yview_scroll(int(-1 * (evenement.delta / 120)), "units")
+
+        canevas.bind("<Enter>", lambda _e: canevas.bind_all("<MouseWheel>", _molette))
+        canevas.bind("<Leave>", lambda _e: canevas.unbind_all("<MouseWheel>"))
+
         self.construire()
 
     def construire(self) -> None:
