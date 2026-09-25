@@ -80,6 +80,50 @@ class DepotHistorique(Depot):
         )
         return list(reversed(lignes))
 
+    def sommes_periode(self, site_id: int, zone_id: int | None, debut: date, fin: date) -> dict:
+        """Sommes des champs de l'historique sur une période (KPI, UC16), et nombre de jours."""
+        return self._un(
+            """SELECT count(*) AS nb_jours,
+                      COALESCE(sum(volume_traite), 0)::float AS volume,
+                      COALESCE(sum(heures_travaillees), 0)::float AS heures_travaillees,
+                      COALESCE(sum(heures_travaillees - heures_inactives), 0)::float
+                          AS heures_necessaires,
+                      COALESCE(sum(heures_sup), 0)::float AS heures_sup,
+                      COALESCE(sum(heures_interim), 0)::float AS heures_interim,
+                      COALESCE(sum(heures_absence), 0)::float AS heures_absence,
+                      COALESCE(sum(heures_inactives), 0)::float AS heures_inactives,
+                      COALESCE(sum(heures_usage_equipement), 0)::float AS heures_usage_equipement,
+                      COALESCE(sum(heures_disponibles_equipement), 0)::float
+                          AS heures_disponibles_equipement,
+                      COALESCE(sum(heures_panne_equipement), 0)::float AS heures_panne_equipement,
+                      COALESCE(sum(cout_rh), 0)::float AS cout_rh,
+                      COALESCE(sum(commandes_a_temps), 0) AS commandes_a_temps,
+                      COALESCE(sum(commandes_totales), 0) AS commandes_totales
+               FROM historique_activite
+               WHERE site_id = %s AND (%s::int IS NULL OR zone_id = %s)
+                 AND date_jour BETWEEN %s AND %s""",
+            (site_id, zone_id, zone_id, debut, fin),
+        )
+
+    def sommes_premiers_jours(
+        self, site_id: int, zone_id: int | None, nb_jours: int
+    ) -> tuple[float, float, float]:
+        """Σvolume, Σheures travaillées et Σcoût RH des ``nb_jours`` premiers jours
+        d'historique connus (cibles par défaut de PRODUCTIVITE et COUT_UNITE, UC15)."""
+        ligne = self._un(
+            """WITH premiers AS (
+                   SELECT volume_traite, heures_travaillees, cout_rh FROM historique_activite
+                   WHERE site_id = %s AND (%s::int IS NULL OR zone_id = %s)
+                   ORDER BY date_jour ASC LIMIT %s
+               )
+               SELECT COALESCE(sum(volume_traite), 0)::float AS volume,
+                      COALESCE(sum(heures_travaillees), 0)::float AS heures_travaillees,
+                      COALESCE(sum(cout_rh), 0)::float AS cout_rh
+               FROM premiers""",
+            (site_id, zone_id, zone_id, nb_jours),
+        )
+        return ligne["volume"], ligne["heures_travaillees"], ligne["cout_rh"]
+
     def ligne(self, site_id: int, zone_id: int, jour: date) -> dict | None:
         return self._un(
             f"SELECT {COLONNES} {_DE} "

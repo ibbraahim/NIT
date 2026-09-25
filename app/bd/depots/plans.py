@@ -117,6 +117,45 @@ class DepotPlansCharge(Depot):
             )
         return len(lignes)
 
+    # --- Agrégats pour les KPI (UC16) --------------------------------------
+    def heures_planifiees_periode(
+        self, site_id: int, zone_id: int | None, debut: date, fin: date
+    ) -> float:
+        """Σ(effectif planifié + intérim) × durée de poste, sur les plans validés de la période
+        (KPI ADEQUATION)."""
+        return self._un(
+            """SELECT COALESCE(sum((l.effectif_planifie + l.interim_planifie)
+                                    * z.duree_poste_heures), 0)::float AS heures
+               FROM plans_charge_lignes l
+               JOIN plans_charge p ON p.id = l.plan_id
+               JOIN zones z ON z.id = l.zone_id
+               WHERE p.site_id = %s AND p.statut = 'valide'
+                 AND (%s::int IS NULL OR l.zone_id = %s) AND l.date_jour BETWEEN %s AND %s""",
+            (site_id, zone_id, zone_id, debut, fin),
+        )["heures"]
+
+    def cout_planifie_periode(
+        self,
+        site_id: int,
+        zone_id: int | None,
+        debut: date,
+        fin: date,
+        taux_interne: float,
+        taux_interim: float,
+    ) -> float:
+        """Coût du plan validé (heures internes + intérim, KPI ECART_COUT)."""
+        return self._un(
+            """SELECT COALESCE(sum(l.effectif_planifie * z.duree_poste_heures * %s
+                                    + l.interim_planifie * z.duree_poste_heures * %s), 0)::float
+                          AS cout
+               FROM plans_charge_lignes l
+               JOIN plans_charge p ON p.id = l.plan_id
+               JOIN zones z ON z.id = l.zone_id
+               WHERE p.site_id = %s AND p.statut = 'valide'
+                 AND (%s::int IS NULL OR l.zone_id = %s) AND l.date_jour BETWEEN %s AND %s""",
+            (taux_interne, taux_interim, site_id, zone_id, zone_id, debut, fin),
+        )["cout"]
+
 
 class DepotScenarios(Depot):
     """Accès à la table ``scenarios`` (UC13)."""

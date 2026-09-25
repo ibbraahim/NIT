@@ -375,14 +375,13 @@ CREATE TABLE kpi_valeurs (
     statut              statut_kpi NOT NULL DEFAULT 'gris',
     date_calcul         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Unicité (KPI, site, zone, périodicité, début de période, méthode), zone et méthode facultatives :
--- deux index partiels (avec et sans méthode), la zone absente étant ramenée à 0.
-CREATE UNIQUE INDEX kpi_valeurs_unique_methode ON kpi_valeurs (
-    kpi_id, site_id, (COALESCE(zone_id, 0)), periodicite, date_debut_periode, methode
-) WHERE methode IS NOT NULL;
-CREATE UNIQUE INDEX kpi_valeurs_unique_sans_methode ON kpi_valeurs (
-    kpi_id, site_id, (COALESCE(zone_id, 0)), periodicite, date_debut_periode
-) WHERE methode IS NULL;
+-- Unicité (KPI, site, zone, périodicité, début de période, méthode), zone et méthode
+-- facultatives : NULLS NOT DISTINCT traite les NULL comme égaux entre eux, ce qui rend
+-- l'index directement utilisable par ON CONFLICT sans caster l'énuméré ni recourir à des
+-- valeurs neutres (nécessaire à partir de PostgreSQL 15).
+CREATE UNIQUE INDEX kpi_valeurs_unique ON kpi_valeurs (
+    kpi_id, site_id, zone_id, periodicite, date_debut_periode, methode
+) NULLS NOT DISTINCT;
 CREATE INDEX kpi_valeurs_recherche_idx ON kpi_valeurs (site_id, zone_id, periodicite, date_debut_periode);
 
 CREATE TABLE alertes (

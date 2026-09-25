@@ -41,7 +41,9 @@ DROITS: dict[str, frozenset[str]] = {
     "lecture_referentiels": frozenset({P, R, D, A, S}),
     "lecture_previsions": frozenset({P, R, S}),
     "lecture_plan": frozenset({P, R, S}),
-    "lecture_alertes": frozenset({P, R, S}),
+    # L'administrateur voit les alertes de dérive de modèle depuis l'écran Modèles (UC21),
+    # bien qu'il ne traite pas les alertes lui-même (UC19, réservé au planificateur/responsable).
+    "lecture_alertes": frozenset({P, R, A, S}),
     "lecture_modeles": frozenset({A, R, S}),
     "taches": frozenset({A, S}),
 }

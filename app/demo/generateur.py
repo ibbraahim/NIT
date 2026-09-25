@@ -9,7 +9,9 @@
 - prévisions de volume sur 28 jours, avec le pic de +40 % du jeudi de la semaine de
   démonstration et le creux du mardi suivant ;
 - modèles entraînés pour chaque zone et régression linéaire retenue par défaut pour le plan
-  de charge (voir docs/plan.md, Q3 et Q4, pour les choix documentés).
+  de charge (voir docs/plan.md, Q3 et Q4, pour les choix documentés) ;
+- rétro-prévisions et rapprochement réel/prévu sur la période de test des modèles (UC20),
+  matière des KPI de précision et de la détection de dérive (UC21 — voir docs/plan.md, Q5).
 """
 
 from __future__ import annotations
@@ -17,22 +19,27 @@ from __future__ import annotations
 import csv
 import math
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import numpy as np
 
 from app.bd.connexion import transaction
 from app.bd.depots.historique import DepotHistorique
+from app.bd.depots.modeles import DepotModeles
 from app.bd.depots.parametres import DepotParametres
 from app.bd.depots.previsions import DepotPrevisionsVolume
+from app.bd.depots.previsions_ressources import DepotPrevisionsRessources
 from app.bd.depots.referentiels import DepotReferentiels
 from app.bd.depots.utilisateurs import DepotUtilisateurs
 from app.config import DOSSIER_RESSOURCES
 from app.contexte import Contexte
 from app.journal import journal
-from app.services import modeles, planification
+from app.ml import prediction, preparation
+from app.ml.entrainement import METHODES
+from app.services import comparaison, modeles, planification
 from app.services.auth import hacher_mot_de_passe
 from app.services.donnees import HORIZON_PREVISION_JOURS
+from app.services.planification import TAILLE_FENETRE_MOBILE
 from app.utils.dates import lundi_de
 
 _log = journal(__name__)
@@ -120,6 +127,14 @@ def generer_demonstration(
     )
     entrainer_et_activer_demo(resultat["site_id"], resultat["zones"])
     afficher("Modèles entraînés pour chaque zone (régression linéaire retenue par défaut).")
+    resultat_retro = generer_retro_donnees_comparaison_demo(
+        resultat["site_id"], resultat["zones"], date_reference
+    )
+    afficher(
+        f"Réalisé rapproché aux prévisions sur la période de test des modèles : "
+        f"{resultat_retro['nb_comparaisons']} jour(s) comparé(s), "
+        f"{resultat_retro['nb_alertes']} alerte(s) de dérive."
+    )
     generer_previsions_et_plans_demo(resultat["site_id"], resultat["zones"], date_reference)
     afficher(
         "Prévisions de ressources générées et plan de charge validé pour la semaine de "
@@ -420,6 +435,135 @@ def entrainer_et_activer_demo(site_id: int, zones: dict[str, int]) -> None:
             modeles.activer_version(
                 ctx, version.version_id, retenir_pour_plan=version.methode == "regression_lineaire"
             )
+
+
+# =====================================================================
+# Rétro-prévisions et comparaison réel/prévu (UC20, UC21 ; matière des KPI de précision)
+# =====================================================================
+def generer_retro_donnees_comparaison_demo(
+    site_id: int, zones: dict[str, int], date_reference: date
+) -> dict:
+    """Rétro-prévisions de volume et de ressources sur la période de test des modèles (docs/
+    plan.md, Q5), puis rapprochement réel/prévu (UC20) et détection de dérive (UC21).
+
+    Les prévisions de volume rétroactives reprennent le volume réellement traité (biais nul
+    sur le volume : l'écart mesuré vient du modèle heures/équipements lui-même, comme un vrai
+    test a posteriori). Les prévisions de ressources sont calculées avec les pipelines RL et
+    RN déjà entraînés, sur exactement la période de test qui a servi à leur évaluation
+    (UC08/UC09) : les KPI de précision (lot 5) retrouvent ainsi les mêmes erreurs.
+    """
+    ctx_resp = _contexte_compte("resp", "responsable", site_id)
+    config = modeles.recuperer_parametres(_contexte_administrateur())
+    part_test = config["part_test"]
+    horodatage = datetime.now()
+
+    bornes: list[date] = []
+    with transaction() as cur:
+        ref = DepotReferentiels(cur)
+        depot_hist = DepotHistorique(cur)
+        depot_modeles = DepotModeles(cur)
+        depot_volume = DepotPrevisionsVolume(cur)
+        depot_previsions = DepotPrevisionsRessources(cur)
+
+        for zone_id in zones.values():
+            zone = ref.zone(zone_id)
+            historique = depot_hist.historique_complet(site_id, zone_id)
+            n_test = max(1, round(len(historique) * part_test))
+            if len(historique) <= n_test + TAILLE_FENETRE_MOBILE:
+                continue
+            historique_recent = historique[-(n_test + TAILLE_FENETRE_MOBILE) : -n_test]
+            periode_test = historique[-n_test:]
+            bornes += [periode_test[0]["date_jour"], periode_test[-1]["date_jour"]]
+
+            depot_volume.upsert_plusieurs(
+                [
+                    {
+                        "site_id": site_id,
+                        "zone_id": zone_id,
+                        "date_jour": h["date_jour"],
+                        "volume_prevu": h["volume_traite"],
+                        "indicateur_pic": h["indicateur_pic"],
+                        "source": "demonstration_retro",
+                    }
+                    for h in periode_test
+                ]
+            )
+
+            dates_test = [h["date_jour"] for h in periode_test]
+            volumes_par_date = {h["date_jour"]: h["volume_traite"] for h in periode_test}
+            dates_completes = [h["date_jour"] for h in historique_recent] + dates_test
+            volumes_completes = [h["volume_traite"] for h in historique_recent] + [
+                volumes_par_date[d] for d in dates_test
+            ]
+            pics_completes = [h["indicateur_pic"] for h in historique_recent] + [
+                h["indicateur_pic"] for h in periode_test
+            ]
+
+            lignes_ressources = []
+            for methode in METHODES:
+                version_heures = depot_modeles.version_active(site_id, zone_id, methode, "heures")
+                version_eqp = depot_modeles.version_active(site_id, zone_id, methode, "equipements")
+                if version_heures is None or version_eqp is None:
+                    continue
+                variables_actives = version_heures["parametres"]["variables_actives"]
+                x_complet = preparation.construire_variables(
+                    dates_completes, volumes_completes, pics_completes, variables_actives
+                )
+                x_horizon = x_complet.iloc[len(historique_recent) :].reset_index(drop=True)
+                masque = preparation.lignes_utilisables(x_horizon).to_numpy()
+                dates_valides = [d for d, garder in zip(dates_test, masque, strict=True) if garder]
+                if not dates_valides:
+                    continue
+                x_valide = x_horizon[masque].reset_index(drop=True)
+
+                pipeline_heures = modeles.charger_pipeline(version_heures["chemin_fichier"])
+                pipeline_eqp = modeles.charger_pipeline(version_eqp["chemin_fichier"])
+                pred_heures = prediction.predire(
+                    pipeline_heures,
+                    x_valide,
+                    version_heures["metriques"]["quantile_bas"],
+                    version_heures["metriques"]["quantile_haut"],
+                )
+                pred_eqp = prediction.predire(
+                    pipeline_eqp,
+                    x_valide,
+                    version_eqp["metriques"]["quantile_bas"],
+                    version_eqp["metriques"]["quantile_haut"],
+                )
+                for i, jour in enumerate(dates_valides):
+                    heures = float(pred_heures["prediction"].iloc[i])
+                    lignes_ressources.append(
+                        {
+                            "site_id": site_id,
+                            "zone_id": zone_id,
+                            "date_jour": jour,
+                            "modele_version_id": version_heures["id"],
+                            "modele_version_equipements_id": version_eqp["id"],
+                            "methode": methode,
+                            "volume_prevu": volumes_par_date[jour],
+                            "heures": heures,
+                            "effectif": prediction.heures_vers_effectif(
+                                heures, zone["duree_poste_heures"]
+                            ),
+                            "equipements": prediction.arrondi_entier_superieur(
+                                pred_eqp["prediction"].iloc[i]
+                            ),
+                            "ic_bas": float(pred_heures["ic_bas"].iloc[i]),
+                            "ic_haut": float(pred_heures["ic_haut"].iloc[i]),
+                            "ic_bas_equipements": float(pred_eqp["ic_bas"].iloc[i]),
+                            "ic_haut_equipements": float(pred_eqp["ic_haut"].iloc[i]),
+                            "date_generation": horodatage,
+                        }
+                    )
+            depot_previsions.inserer_plusieurs(lignes_ressources)
+
+    if not bornes:
+        return {"nb_comparaisons": 0, "nb_alertes": 0}
+    resultat_comparaison = comparaison.comparer_realise(
+        ctx_resp, site_id, debut=min(bornes), fin=max(bornes)
+    )
+    alertes = comparaison.detecter_derive(ctx_resp, site_id, date_reference=date_reference)
+    return {"nb_comparaisons": resultat_comparaison["nb_comparables"], "nb_alertes": len(alertes)}
 
 
 # =====================================================================

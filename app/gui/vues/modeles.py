@@ -15,7 +15,7 @@ from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import CIBLES_MODELE, METHODES
 from app.ml.preparation import JOURS_SEMAINE, LIBELLES_VARIABLES, VARIABLES_PAR_DEFAUT
-from app.services import admin, modeles
+from app.services import admin, alertes, modeles
 from app.utils.format_fr import formater_date_heure, formater_nombre, formater_pourcentage
 
 OPTIONS_ACTIVATION = [
@@ -248,8 +248,10 @@ class OngletEntrainement(ttk.Frame):
         )
         self.label_derive.pack(anchor="w")
         self.bandeau_derive.pack(fill="x", pady=(0, 8))
+        self.bandeau_derive.pack_forget()  # masqué tant qu'aucune alerte de dérive n'est connue
 
         haut = ttk.Frame(self)
+        self.haut_barre = haut
         haut.pack(fill="x", pady=(0, 8))
         self.site = ChampListe(haut, "Site", largeur=28)
         self.site.pack(side="left")
@@ -304,7 +306,6 @@ class OngletEntrainement(ttk.Frame):
         self.graphique.afficher_message("Sélectionnez une version pour voir ses résidus.")
 
     def actualiser(self) -> None:
-        self.bandeau_derive.pack_forget()  # bandeau des alertes de dérive : câblé au lot 6 (UC21)
         sites = self.vue.executer(lambda: admin.lister_sites(self.ctx)) or []
         self.site.definir_options([(s["id"], s["nom"]) for s in sites])
         self._sur_changement_site()
@@ -319,7 +320,29 @@ class OngletEntrainement(ttk.Frame):
         self.zone.definir_options(
             [OPTION_TOUTES_ZONES] + [(z["id"], z["nom"]) for z in zones], conserver=False
         )
+        self._actualiser_bandeau_derive(site_id)
         self.actualiser_tableau()
+
+    def _actualiser_bandeau_derive(self, site_id: int | None) -> None:
+        """Bandeau des alertes de dérive de modèle du site (UC21) : les avertit qu'une
+        méthode retenue pour le plan a décroché du réel, avant qu'ils n'activent une autre
+        version (UC10)."""
+        ouvertes = (
+            self.vue.executer(
+                lambda: alertes.lister_alertes_ouvertes(self.ctx, site_id, "derive_modele")
+            )
+            or []
+            if site_id is not None
+            else []
+        )
+        if not ouvertes:
+            self.bandeau_derive.pack_forget()
+            return
+        texte = " · ".join(
+            f"{'⛔' if a['niveau'] == 'rouge' else '⚠'} {a['message']}" for a in ouvertes
+        )
+        self.label_derive.configure(text=texte)
+        self.bandeau_derive.pack(fill="x", pady=(0, 8), before=self.haut_barre)
 
     def actualiser_tableau(self) -> None:
         site_id = self.site.valeur()

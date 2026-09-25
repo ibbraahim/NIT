@@ -15,3 +15,14 @@ def compter_alertes_ouvertes(ctx: Contexte) -> int:
     sites = None if ctx.voit_tous_les_sites else sorted(ctx.sites)
     with transaction() as cur:
         return DepotAlertes(cur).compter_ouvertes(sites)
+
+
+def lister_alertes_ouvertes(
+    ctx: Contexte, site_id: int, type_alerte: str | None = None
+) -> list[dict]:
+    """Alertes ouvertes ou en cours d'un site (bandeau de dérive de l'écran Modèles, UC21 ;
+    futur écran Alertes, UC18/UC19)."""
+    if not a_le_droit(ctx, "lecture_alertes") or not ctx.peut_voir_site(site_id):
+        return []
+    with transaction() as cur:
+        return DepotAlertes(cur).ouvertes(site_id, type_alerte)
