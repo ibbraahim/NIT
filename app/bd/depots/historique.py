@@ -62,6 +62,14 @@ class DepotHistorique(Depot):
             (sites, sites, zone_id, zone_id, debut, fin),
         )
 
+    def historique_complet(self, site_id: int, zone_id: int) -> list[dict]:
+        """Tout l'historique d'une zone, trié par date croissante (entraînement des modèles)."""
+        return self._tous(
+            f"SELECT {COLONNES} {_DE} WHERE h.site_id = %s AND h.zone_id = %s "
+            "ORDER BY h.date_jour ASC",
+            (site_id, zone_id),
+        )
+
     def ligne(self, site_id: int, zone_id: int, jour: date) -> dict | None:
         return self._un(
             f"SELECT {COLONNES} {_DE} "

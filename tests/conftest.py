@@ -123,6 +123,7 @@ COMPTES = {
 MODULES_AVEC_DIALOGUES = [
     "app.gui.fenetre_principale",
     "app.gui.vues.donnees",
+    "app.gui.vues.modeles",
     "app.gui.widgets.resultat_import",
 ]
 
