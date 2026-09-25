@@ -124,6 +124,8 @@ MODULES_AVEC_DIALOGUES = [
     "app.gui.fenetre_principale",
     "app.gui.vues.donnees",
     "app.gui.vues.modeles",
+    "app.gui.vues.previsions",
+    "app.gui.vues.plan_charge",
     "app.gui.widgets.resultat_import",
 ]
 
@@ -156,14 +158,20 @@ def application(demo_referentiels, monkeypatch):
     def informer_silencieux(_parent, message, *_args, **_kwargs):
         infos.append(message)
 
+    def confirmer_oui(*_args, **_kwargs):
+        return True
+
     monkeypatch.setattr(dialogues, "afficher_erreur", erreur_bloquante)
     monkeypatch.setattr(dialogues, "informer", informer_silencieux)
+    monkeypatch.setattr(dialogues, "confirmer", confirmer_oui)
     for nom_module in MODULES_AVEC_DIALOGUES:
         module = importlib.import_module(nom_module)
         if hasattr(module, "afficher_erreur"):
             monkeypatch.setattr(module, "afficher_erreur", erreur_bloquante)
         if hasattr(module, "informer"):
             monkeypatch.setattr(module, "informer", informer_silencieux)
+        if hasattr(module, "confirmer"):
+            monkeypatch.setattr(module, "confirmer", confirmer_oui)
 
     application = fp.Application(racine)
     application.erreurs = erreurs

@@ -30,7 +30,7 @@ from app.bd.depots.utilisateurs import DepotUtilisateurs
 from app.config import DOSSIER_RESSOURCES
 from app.contexte import Contexte
 from app.journal import journal
-from app.services import modeles
+from app.services import modeles, planification
 from app.services.auth import hacher_mot_de_passe
 from app.services.donnees import HORIZON_PREVISION_JOURS
 from app.utils.dates import lundi_de
@@ -120,6 +120,11 @@ def generer_demonstration(
     )
     entrainer_et_activer_demo(resultat["site_id"], resultat["zones"])
     afficher("Modèles entraînés pour chaque zone (régression linéaire retenue par défaut).")
+    generer_previsions_et_plans_demo(resultat["site_id"], resultat["zones"], date_reference)
+    afficher(
+        "Prévisions de ressources générées et plan de charge validé pour la semaine de "
+        "démonstration et la semaine suivante."
+    )
     _log.info("Jeu de démonstration généré (date de référence %s).", date_reference)
     return resultat
 
@@ -404,12 +409,84 @@ def _contexte_administrateur() -> Contexte:
 
 
 def entrainer_et_activer_demo(site_id: int, zones: dict[str, int]) -> None:
-    """Entraîne RL et RN pour chaque zone et retient la régression linéaire par défaut
-    (référence de départ ; la comparaison réel/prévu, au lot 5, montrera si le réseau de
-    neurones la surpasse sur les pics, invitant à en changer via UC10 au lot 8)."""
+    """Entraîne RL et RN pour chaque zone et active les deux (UC11 en a besoin pour les
+    comparer côte à côte) ; la régression linéaire est retenue par défaut pour le plan de
+    charge (référence de départ — la comparaison réel/prévu, au lot 5, montrera si le
+    réseau de neurones la surpasse sur les pics, invitant à en changer via UC10 au lot 8)."""
     ctx = _contexte_administrateur()
     for zone_id in zones.values():
         resume = modeles.entrainer_modeles(ctx, site_id, zone_id)
         for version in resume.versions:
-            if version.methode == "regression_lineaire":
-                modeles.activer_version(ctx, version.version_id)
+            modeles.activer_version(
+                ctx, version.version_id, retenir_pour_plan=version.methode == "regression_lineaire"
+            )
+
+
+# =====================================================================
+# Prévisions de ressources et plan de charge (au nom des comptes planif et resp)
+# =====================================================================
+def _commentaire_depassement(ligne: dict) -> str:
+    """Commentaire honnête d'une case en dépassement : selon la dimension réellement en cause
+    (effectif ou seulement équipements), pour ne pas toujours invoquer la campagne
+    promotionnelle même quand ce n'est pas elle qui explique le dépassement."""
+    if ligne["besoin_effectif"] > ligne["capacite_effectif"]:
+        return (
+            "Pic de volume lié à une campagne promotionnelle : renfort intérim et heures "
+            "supplémentaires nécessaires."
+        )
+    return "Besoin en équipements supérieur au nombre d'équipements disponibles ce jour-là."
+
+
+def _contexte_compte(identifiant: str, role: str, site_id: int) -> Contexte:
+    with transaction() as cur:
+        utilisateur = DepotUtilisateurs(cur).par_identifiant(identifiant)
+    return Contexte(
+        utilisateur_id=utilisateur["id"],
+        identifiant=identifiant,
+        role=role,
+        nom_complet=f"{utilisateur['prenom']} {utilisateur['nom']}".strip(),
+        sites=frozenset({site_id}),
+    )
+
+
+def generer_previsions_et_plans_demo(
+    site_id: int, zones: dict[str, int], date_reference: date
+) -> None:
+    """UC11 pour toutes les zones (28 jours), puis UC12/UC14 : plan proposé, les cases en
+    dépassement commentées, soumis et validé pour la semaine de démonstration et la semaine
+    suivante — pour que le planificateur voie tout, sans autre action, en ouvrant l'écran
+    Plan de charge."""
+    ctx_planif = _contexte_compte("planif", "planificateur", site_id)
+    ctx_resp = _contexte_compte("resp", "responsable", site_id)
+
+    for zone_id in zones.values():
+        planification.generer_previsions(ctx_planif, site_id, zone_id, 28)
+
+    semaine_demo = semaine_demonstration(date_reference)
+    semaine_suivante = semaine_demo + timedelta(days=7)
+    for semaine in (semaine_demo, semaine_suivante):
+        resultat = planification.proposer_plan_charge(ctx_planif, site_id, semaine)
+        plan = planification.lire_plan_charge(ctx_planif, site_id, semaine)
+        ajustements = []
+        for ligne in plan["lignes"]:
+            if planification.statut_couleur_ligne(ligne) == "rouge":
+                ajustements.append({**ligne, "commentaire": _commentaire_depassement(ligne)})
+            elif (
+                semaine == semaine_suivante
+                and ligne["besoin_effectif"] < ligne["capacite_effectif"]
+            ):
+                # « Le même planning que la semaine précédente » (voir <donnees_demo>) : le
+                # planificateur n'a pas réduit l'effectif malgré le volume plus faible, d'où
+                # le sureffectif du mardi suivant.
+                ajustements.append(
+                    {
+                        **ligne,
+                        "effectif_planifie": ligne["capacite_effectif"],
+                        "interim_planifie": 0,
+                        "equipements_planifies": ligne["capacite_equipements"],
+                    }
+                )
+        if ajustements:
+            planification.enregistrer_brouillon_plan(ctx_planif, resultat["plan_id"], ajustements)
+        planification.soumettre_plan(ctx_planif, resultat["plan_id"])
+        planification.valider_plan(ctx_resp, resultat["plan_id"])

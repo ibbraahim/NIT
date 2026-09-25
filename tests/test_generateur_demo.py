@@ -186,7 +186,9 @@ def test_deux_chariots_reception_en_maintenance(demo_complete):
         assert cur.fetchone()["n"] == generateur.NB_CHARIOTS_MAINTENANCE_DEMO
 
 
-def test_modeles_entraines_et_regression_lineaire_retenue(demo_complete):
+def test_modeles_entraines_regression_lineaire_retenue_les_deux_actives(demo_complete):
+    """UC11 a besoin des deux méthodes actives à la fois ; seule la RL est retenue pour le
+    plan de charge (référence de départ)."""
     site_id = demo_complete["site_id"]
     with transaction() as cur:
         cur.execute(
@@ -201,8 +203,9 @@ def test_modeles_entraines_et_regression_lineaire_retenue(demo_complete):
     assert lignes[("regression_lineaire", "heures")]["actifs"] == nb_zones
     assert lignes[("regression_lineaire", "heures")]["retenues"] == nb_zones
     assert lignes[("regression_lineaire", "equipements")]["actifs"] == nb_zones
-    assert lignes[("reseau_neurones", "heures")]["actifs"] == 0
-    assert lignes[("reseau_neurones", "equipements")]["actifs"] == 0
+    assert lignes[("reseau_neurones", "heures")]["actifs"] == nb_zones
+    assert lignes[("reseau_neurones", "heures")]["retenues"] == 0
+    assert lignes[("reseau_neurones", "equipements")]["actifs"] == nb_zones
     for cle in lignes:
         assert lignes[cle]["n"] == nb_zones  # une version par zone et par entraînement
 
@@ -211,3 +214,78 @@ def test_bandeau_de_demonstration_signale(demo_complete):
     with transaction() as cur:
         cur.execute("SELECT valeur FROM parametres_application WHERE cle = 'donnees_demonstration'")
         assert cur.fetchone()["valeur"] == "oui"
+
+
+# ---------------------------------------------------------------------
+# UC11/UC12/UC14 : prévisions de ressources et plan de charge de la démonstration
+# ---------------------------------------------------------------------
+def test_previsions_ressources_generees_pour_toutes_les_zones(demo_complete):
+    site_id = demo_complete["site_id"]
+    with transaction() as cur:
+        cur.execute(
+            """SELECT zone_id, methode::text, count(*) AS n FROM previsions_ressources
+               WHERE site_id = %s GROUP BY zone_id, methode""",
+            (site_id,),
+        )
+        lignes = cur.fetchall()
+    assert {ligne["zone_id"] for ligne in lignes} == set(demo_complete["zones"].values())
+    assert {ligne["methode"] for ligne in lignes} == {"regression_lineaire", "reseau_neurones"}
+    assert all(ligne["n"] > 0 for ligne in lignes)
+
+
+def test_plans_de_charge_valides(demo_complete):
+    site_id = demo_complete["site_id"]
+    lundi_demo = generateur.semaine_demonstration(DATE_REFERENCE)
+    with transaction() as cur:
+        for semaine in (lundi_demo, lundi_demo + timedelta(days=7)):
+            cur.execute(
+                "SELECT statut::text FROM plans_charge WHERE site_id = %s AND semaine = %s",
+                (site_id, semaine),
+            )
+            ligne = cur.fetchone()
+            assert ligne is not None, f"Aucun plan pour la semaine du {semaine}"
+            assert ligne["statut"] == "valide"
+
+
+def test_jeudi_de_la_semaine_de_demo_en_rouge_pour_toutes_les_zones(demo_complete):
+    from app.services import planification
+
+    site_id = demo_complete["site_id"]
+    lundi_demo = generateur.semaine_demonstration(DATE_REFERENCE)
+    jeudi = lundi_demo + timedelta(days=3)
+    with transaction() as cur:
+        cur.execute(
+            """SELECT l.zone_id, l.besoin_effectif, l.besoin_equipements, l.effectif_planifie,
+                      l.interim_planifie, l.equipements_planifies, l.capacite_effectif,
+                      l.capacite_equipements, l.commentaire
+               FROM plans_charge_lignes l JOIN plans_charge p ON p.id = l.plan_id
+               WHERE p.site_id = %s AND p.semaine = %s AND l.date_jour = %s""",
+            (site_id, lundi_demo, jeudi),
+        )
+        lignes = cur.fetchall()
+    assert len(lignes) == len(demo_complete["zones"])
+    for ligne in lignes:
+        assert planification.statut_couleur_ligne(ligne) == "rouge"
+        assert ligne["commentaire"]  # commentaire obligatoire, déjà rempli par le générateur
+
+
+def test_mardi_suivant_signale_en_sureffectif(demo_complete):
+    from app.services import planification
+
+    site_id = demo_complete["site_id"]
+    lundi_suivant = generateur.semaine_demonstration(DATE_REFERENCE) + timedelta(days=7)
+    mardi = lundi_suivant + timedelta(days=1)
+    with transaction() as cur:
+        cur.execute(
+            """SELECT l.besoin_effectif, l.besoin_equipements, l.effectif_planifie,
+                      l.interim_planifie, l.equipements_planifies, l.capacite_effectif,
+                      l.capacite_equipements
+               FROM plans_charge_lignes l JOIN plans_charge p ON p.id = l.plan_id
+               WHERE p.site_id = %s AND p.semaine = %s AND l.date_jour = %s""",
+            (site_id, lundi_suivant, mardi),
+        )
+        lignes = cur.fetchall()
+    assert len(lignes) == len(demo_complete["zones"])
+    # Au moins une zone doit ressortir en sureffectif (adéquation infinie ou > 105 %) ce jour-là.
+    couleurs = [planification.statut_couleur_ligne(ligne) for ligne in lignes]
+    assert "orange" in couleurs

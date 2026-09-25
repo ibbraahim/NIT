@@ -70,6 +70,16 @@ class DepotHistorique(Depot):
             (site_id, zone_id),
         )
 
+    def dernieres_lignes(self, site_id: int, zone_id: int, avant: date, n: int = 7) -> list[dict]:
+        """Les ``n`` derniers jours d'historique avant une date, triés par date croissante
+        (moyenne mobile des prévisions, UC11)."""
+        lignes = self._tous(
+            f"SELECT {COLONNES} {_DE} WHERE h.site_id = %s AND h.zone_id = %s AND h.date_jour < %s "
+            "ORDER BY h.date_jour DESC LIMIT %s",
+            (site_id, zone_id, avant, n),
+        )
+        return list(reversed(lignes))
+
     def ligne(self, site_id: int, zone_id: int, jour: date) -> dict | None:
         return self._un(
             f"SELECT {COLONNES} {_DE} "

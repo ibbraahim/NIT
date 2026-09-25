@@ -277,11 +277,15 @@ def entrainer_modeles(
                     chemin_relatif = f"{nom}_{horodatage}.joblib"
                     joblib.dump(resultat.pipeline, DOSSIER_MODELES / chemin_relatif)
                     # Les résidus et prédictions du jeu de test sont conservés (dans les
-                    # métriques) pour le graphique des résidus de l'écran Modèles.
+                    # métriques) pour le graphique des résidus de l'écran Modèles ; les
+                    # quantiles sont réutilisés tels quels par UC11 pour l'intervalle de
+                    # confiance de chaque nouvelle prédiction.
                     metriques_stockees = {
                         **resultat.metriques,
                         "residus_test": resultat.residus_test,
                         "predictions_test": resultat.predictions_test,
+                        "quantile_bas": resultat.quantile_bas,
+                        "quantile_haut": resultat.quantile_haut,
                     }
                     version_id = depot_modeles.creer(
                         site_id,
@@ -355,9 +359,16 @@ def comparer_avant_activation(ctx: Contexte, version_id: int) -> dict:
     return {"candidate": candidate, "actif_actuel": actif_actuel}
 
 
-def activer_version(ctx: Contexte, version_id: int) -> None:
-    """UC10 : active la version sélectionnée ; si elle porte sur les heures, retient aussi sa
-    méthode pour le plan de charge (UC12) et la détection de dérive (UC21)."""
+def activer_version(ctx: Contexte, version_id: int, retenir_pour_plan: bool = True) -> None:
+    """UC10 : active la version sélectionnée pour sa méthode (RL et RN restent actives
+    indépendamment : UC11 a besoin des deux en même temps).
+
+    Si elle porte sur les heures et que ``retenir_pour_plan`` est vrai (par défaut, ce qui
+    correspond au bouton « Activer la version sélectionnée » de l'écran Modèles), sa méthode
+    devient aussi celle retenue pour le plan de charge (UC12) et la détection de dérive
+    (UC21). Le générateur de démonstration met ``retenir_pour_plan=False`` pour activer le
+    réseau de neurones à côté de la régression linéaire sans lui voler ce statut.
+    """
     verifier_droit(ctx, "UC10")
     with transaction() as cur:
         depot = DepotModeles(cur)
@@ -370,6 +381,6 @@ def activer_version(ctx: Contexte, version_id: int) -> None:
                 "n'a pas convergé) et ne peut pas être activée."
             )
         depot.activer(version_id)
-        if version["cible"] == "heures":
+        if version["cible"] == "heures" and retenir_pour_plan:
             depot.definir_retenue_pour_plan(version_id)
     _log.info("Version de modèle n° %s activée par %s.", version_id, ctx.identifiant)
