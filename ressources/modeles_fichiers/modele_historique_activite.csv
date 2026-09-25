@@ -1,0 +1,2 @@
+site;zone;date;volume_traite;effectif_present;heures_travaillees;heures_sup;heures_interim;heures_absence;heures_inactives;equipements_mobilises;heures_usage_equipement;heures_disponibles_equipement;heures_panne_equipement;cout_rh;commandes_a_temps;commandes_totales;indicateur_pic
+Plateforme Casablanca;Réception;09/03/2026;1250,5;10;75;5;0;0;3;4;28;30;0;3487,50;118;120;Non

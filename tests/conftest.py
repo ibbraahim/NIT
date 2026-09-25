@@ -106,3 +106,75 @@ def demo_referentiels(bd_vierge):
     from app.demo.generateur import generer_referentiels
 
     return generer_referentiels(date.today())
+
+
+# ---------------------------------------------------------------------
+# Interface graphique (fumée) : comptes de démonstration et fenêtre applicative
+# ---------------------------------------------------------------------
+COMPTES = {
+    "admin": "Admin2026!",
+    "planif": "Planif2026!",
+    "resp": "Resp2026!",
+    "direction": "Direction2026!",
+}
+
+#: Modules qui importent nommément ``afficher_erreur``/``informer`` de ``dialogues``
+#: (l'import Python copie la référence : chacun doit être patché séparément).
+MODULES_AVEC_DIALOGUES = [
+    "app.gui.fenetre_principale",
+    "app.gui.vues.donnees",
+    "app.gui.widgets.resultat_import",
+]
+
+
+@pytest.fixture
+def application(demo_referentiels, monkeypatch):
+    """Fenêtre applicative de test : erreurs et informations capturées, jamais affichées."""
+    import os
+    import sys
+
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        pytest.skip("Aucun affichage disponible : lancez les tests avec xvfb-run.")
+    tk = pytest.importorskip("tkinter")
+    try:
+        racine = tk.Tk()
+    except tk.TclError:
+        pytest.skip("Impossible d'ouvrir une fenêtre Tk.")
+
+    import importlib
+
+    import app.gui.fenetre_principale as fp
+    import app.gui.widgets.dialogues as dialogues
+
+    erreurs: list[str] = []
+    infos: list[str] = []
+
+    def erreur_bloquante(_parent, message, *_args, **_kwargs):
+        erreurs.append(message)
+
+    def informer_silencieux(_parent, message, *_args, **_kwargs):
+        infos.append(message)
+
+    monkeypatch.setattr(dialogues, "afficher_erreur", erreur_bloquante)
+    monkeypatch.setattr(dialogues, "informer", informer_silencieux)
+    for nom_module in MODULES_AVEC_DIALOGUES:
+        module = importlib.import_module(nom_module)
+        if hasattr(module, "afficher_erreur"):
+            monkeypatch.setattr(module, "afficher_erreur", erreur_bloquante)
+        if hasattr(module, "informer"):
+            monkeypatch.setattr(module, "informer", informer_silencieux)
+
+    application = fp.Application(racine)
+    application.erreurs = erreurs
+    application.infos = infos
+    yield application
+    application.quitter()
+
+
+def connecter(application, identifiant: str) -> None:
+    """Connecte un compte de démonstration sur l'écran de connexion de ``application``."""
+    ecran = application._cadre
+    ecran.identifiant.definir(identifiant)
+    ecran.mot_de_passe.definir(COMPTES[identifiant])
+    ecran.se_connecter()
+    assert application.contexte is not None, ecran.message.cget("text")
