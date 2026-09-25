@@ -13,7 +13,8 @@
 - rétro-prévisions et rapprochement réel/prévu sur la période de test des modèles (UC20),
   matière des KPI de précision et de la détection de dérive (UC21 — voir docs/plan.md, Q5) ;
 - KPI hebdomadaires calculés et alertes détectées sur le plan validé (UC16-UC18) : sureffectif
-  du mardi suivant, pénurie d'équipements de la zone Réception, seuils de KPI dépassés.
+  du mardi suivant, pénurie d'équipements de la zone Réception, seuils de KPI dépassés ;
+- rapport de performance de la semaine (UC23, PDF et Excel dans ``rapports/``).
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from app.contexte import Contexte
 from app.journal import journal
 from app.ml import prediction, preparation
 from app.ml.entrainement import METHODES
-from app.services import alertes, comparaison, kpi, modeles, planification
+from app.services import alertes, comparaison, kpi, modeles, planification, rapports
 from app.services.auth import hacher_mot_de_passe
 from app.services.donnees import HORIZON_PREVISION_JOURS
 from app.services.planification import TAILLE_FENETRE_MOBILE
@@ -142,8 +143,17 @@ def generer_demonstration(
         "Prévisions de ressources générées et plan de charge validé pour la semaine de "
         "démonstration et la semaine suivante."
     )
+    generer_rapport_demo(resultat["site_id"], date_reference)
+    afficher("Rapport de performance de la semaine généré (UC23, PDF et Excel).")
     _log.info("Jeu de démonstration généré (date de référence %s).", date_reference)
     return resultat
+
+
+def generer_rapport_demo(site_id: int, date_reference: date) -> dict:
+    """UC23, au nom du compte ``resp`` : rapport de performance de la semaine en cours, pour
+    que l'écran Rapports ne soit pas vide à la première ouverture."""
+    ctx_resp = _contexte_compte("resp", "responsable", site_id)
+    return rapports.generer_rapport(ctx_resp, site_id, "semaine", date_reference, "pdf_excel")
 
 
 def generer_referentiels(date_reference: date) -> dict:
