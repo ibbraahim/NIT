@@ -14,6 +14,7 @@ from app.gui.style import COULEURS, appliquer_style
 from app.gui.vues import ACCUEIL, ecran, ecrans_autorises
 from app.gui.widgets.dialogues import afficher_erreur, franciser_tk
 from app.journal import journal
+from app.taches.planificateur import Planificateur
 from app.utils.format_fr import formater_date_heure, formater_date_longue
 
 _log = journal(__name__)
@@ -41,7 +42,9 @@ class Application:
         self.vue_courante: str | None = None
         self._cadre: ttk.Frame | None = None
         self._minuterie: str | None = None
-        self.planificateur = None  # planificateur de tâches (lot 8)
+        self.planificateur = (
+            Planificateur()
+        )  # programmé, mais démarré depuis l'écran Administration
         self.afficher_connexion()
 
     # ------------------------------------------------------------------

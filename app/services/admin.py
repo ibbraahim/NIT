@@ -10,10 +10,12 @@ from datetime import date, timedelta
 
 from app.bd.connexion import transaction
 from app.bd.depots.referentiels import DepotReferentiels
-from app.contexte import Contexte
+from app.bd.depots.utilisateurs import DepotUtilisateurs
+from app.contexte import ROLES, Contexte
 from app.erreurs import DonneesInvalides, OperationImpossible
 from app.journal import journal
 from app.libelles import CATEGORIES_COUT, STATUTS_EQUIPEMENT, TYPES_EQUIPEMENT
+from app.services.auth import hacher_mot_de_passe
 from app.services.droits import verifier_droit, verifier_site
 from app.utils import validation
 from app.utils.dates import jours_semaine, lundi_de
@@ -410,3 +412,174 @@ def etat_application(ctx: Contexte) -> dict:
         "derniere_synchronisation": synchro,
         "derniere_mise_a_jour_historique": derniere_maj,
     }
+
+
+# =====================================================================
+# UC02 · Gérer les utilisateurs et les rôles
+# =====================================================================
+def _role_valide(valeur: str | None) -> str:
+    texte = validation.obligatoire(valeur, "Rôle")
+    if texte not in ROLES:
+        raise ValueError("Choisissez un rôle valide.")
+    return texte
+
+
+def lister_utilisateurs(ctx: Contexte) -> list[dict]:
+    verifier_droit(ctx, "UC02")
+    with transaction() as cur:
+        return DepotUtilisateurs(cur).lister()
+
+
+def creer_utilisateur(
+    ctx: Contexte,
+    identifiant_saisi: str,
+    nom: str,
+    prenom: str,
+    email: str,
+    role: str,
+    mot_de_passe_initial: str,
+    sites: list[int],
+) -> int:
+    """UC02 : crée un compte. Le mot de passe initial est choisi par l'administrateur et
+    communiqué à l'utilisateur (aucun envoi d'e-mail automatique)."""
+    verifier_droit(ctx, "UC02")
+    donnees = _valider(
+        {
+            "identifiant": lambda: validation.identifiant(identifiant_saisi),
+            "nom": lambda: validation.obligatoire(nom, "Nom"),
+            "prenom": lambda: validation.obligatoire(prenom, "Prénom"),
+            "email": lambda: validation.email(email),
+            "role": lambda: _role_valide(role),
+            "mot_de_passe": lambda: validation.mot_de_passe(mot_de_passe_initial),
+        }
+    )
+    with transaction() as cur:
+        depot = DepotUtilisateurs(cur)
+        if depot.par_identifiant(donnees["identifiant"]) is not None:
+            raise DonneesInvalides(
+                "Cet identifiant est déjà utilisé.",
+                {"identifiant": "Identifiant déjà utilisé par un autre compte."},
+            )
+        hash_mdp, sel = hacher_mot_de_passe(donnees["mot_de_passe"])
+        utilisateur_id = depot.creer(
+            donnees["identifiant"],
+            donnees["nom"],
+            donnees["prenom"],
+            donnees["email"],
+            hash_mdp,
+            sel,
+            donnees["role"],
+        )
+        depot.definir_sites(utilisateur_id, sites if donnees["role"] != "administrateur" else [])
+    _log.info(
+        "Utilisateur « %s » (%s) créé par %s.",
+        donnees["identifiant"],
+        donnees["role"],
+        ctx.identifiant,
+    )
+    return utilisateur_id
+
+
+def modifier_utilisateur(
+    ctx: Contexte,
+    utilisateur_id: int,
+    nom: str,
+    prenom: str,
+    email: str,
+    role: str,
+    sites: list[int],
+) -> None:
+    """UC02 : modifie le nom, l'e-mail, le rôle et les sites rattachés (pas l'identifiant ni
+    le mot de passe)."""
+    verifier_droit(ctx, "UC02")
+    donnees = _valider(
+        {
+            "nom": lambda: validation.obligatoire(nom, "Nom"),
+            "prenom": lambda: validation.obligatoire(prenom, "Prénom"),
+            "email": lambda: validation.email(email),
+            "role": lambda: _role_valide(role),
+        }
+    )
+    with transaction() as cur:
+        depot = DepotUtilisateurs(cur)
+        existant = depot.par_id(utilisateur_id)
+        if existant is None:
+            raise OperationImpossible("Utilisateur introuvable.")
+        if (
+            existant["role"] == "administrateur"
+            and donnees["role"] != "administrateur"
+            and depot.compter_administrateurs_actifs(sauf_id=utilisateur_id) == 0
+        ):
+            raise OperationImpossible(
+                "Impossible : il ne resterait plus aucun administrateur actif."
+            )
+        depot.modifier(
+            utilisateur_id, donnees["nom"], donnees["prenom"], donnees["email"], donnees["role"]
+        )
+        depot.definir_sites(utilisateur_id, sites if donnees["role"] != "administrateur" else [])
+    _log.info("Utilisateur n° %s modifié par %s.", utilisateur_id, ctx.identifiant)
+
+
+def activer_utilisateur(ctx: Contexte, utilisateur_id: int, actif: bool) -> None:
+    """UC02 : désactive (compte conservé, connexion refusée) ou réactive un utilisateur."""
+    verifier_droit(ctx, "UC02")
+    with transaction() as cur:
+        depot = DepotUtilisateurs(cur)
+        existant = depot.par_id(utilisateur_id)
+        if existant is None:
+            raise OperationImpossible("Utilisateur introuvable.")
+        if not actif:
+            if utilisateur_id == ctx.utilisateur_id:
+                raise OperationImpossible("Vous ne pouvez pas désactiver votre propre compte.")
+            if (
+                existant["role"] == "administrateur"
+                and depot.compter_administrateurs_actifs(sauf_id=utilisateur_id) == 0
+            ):
+                raise OperationImpossible(
+                    "Impossible de désactiver le dernier administrateur actif."
+                )
+        depot.definir_actif(utilisateur_id, actif)
+    _log.info(
+        "Utilisateur n° %s %s par %s.",
+        utilisateur_id,
+        "réactivé" if actif else "désactivé",
+        ctx.identifiant,
+    )
+
+
+def reinitialiser_mot_de_passe(
+    ctx: Contexte, utilisateur_id: int, nouveau_mot_de_passe: str
+) -> None:
+    """UC02 : impose un nouveau mot de passe (l'utilisateur n'a pas à connaître l'ancien)."""
+    verifier_droit(ctx, "UC02")
+    donnees = _valider({"mot_de_passe": lambda: validation.mot_de_passe(nouveau_mot_de_passe)})
+    with transaction() as cur:
+        depot = DepotUtilisateurs(cur)
+        if depot.par_id(utilisateur_id) is None:
+            raise OperationImpossible("Utilisateur introuvable.")
+        hash_mdp, sel = hacher_mot_de_passe(donnees["mot_de_passe"])
+        depot.definir_mot_de_passe(utilisateur_id, hash_mdp, sel)
+    _log.info(
+        "Mot de passe de l'utilisateur n° %s réinitialisé par %s.", utilisateur_id, ctx.identifiant
+    )
+
+
+# =====================================================================
+# Tâches automatiques (écran Administration, onglet Tâches)
+# =====================================================================
+def lister_journal_taches(ctx: Contexte, limite: int = 100) -> list[dict]:
+    """Dernières exécutions des tâches automatiques, manuelles ou planifiées."""
+    verifier_droit(ctx, "taches")
+    from app.bd.depots.taches import DepotTaches
+
+    with transaction() as cur:
+        return DepotTaches(cur).journal(limite)
+
+
+def executer_tache_manuelle(ctx: Contexte, nom_tache: str) -> str:
+    """Exécute immédiatement une tâche automatique, à la demande de l'administrateur
+    (bouton « Exécuter la tâche sélectionnée »)."""
+    verifier_droit(ctx, "taches")
+    from app.taches.planificateur import executer_tache
+
+    return executer_tache(nom_tache)

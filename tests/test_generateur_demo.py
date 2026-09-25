@@ -289,3 +289,76 @@ def test_mardi_suivant_signale_en_sureffectif(demo_complete):
     # Au moins une zone doit ressortir en sureffectif (adéquation infinie ou > 105 %) ce jour-là.
     couleurs = [planification.statut_couleur_ligne(ligne) for ligne in lignes]
     assert "orange" in couleurs
+
+
+# ---------------------------------------------------------------------
+# UC16-18, UC20-21, UC23 : comparaison, KPI, alertes et rapport de la démonstration
+# (bout en bout, lots 5 à 7 : la « situation du lundi matin » racontée dans À propos se
+# retrouve jusque dans les KPI, les alertes et le rapport, pas seulement dans le plan).
+# ---------------------------------------------------------------------
+def test_comparaisons_realise_generees_sur_la_periode_de_test(demo_complete):
+    """UC20 : le réalisé a été rapproché aux prévisions RL et RN sur la période de test des
+    modèles, matière des KPI de précision et de la détection de dérive (UC21)."""
+    site_id = demo_complete["site_id"]
+    with transaction() as cur:
+        cur.execute(
+            """SELECT p.methode::text, count(*) AS n
+               FROM comparaisons_realise c JOIN previsions_ressources p ON p.id = c.prevision_id
+               WHERE p.site_id = %s GROUP BY p.methode""",
+            (site_id,),
+        )
+        comptes = {ligne["methode"]: ligne["n"] for ligne in cur.fetchall()}
+    assert comptes.get("regression_lineaire", 0) > 0
+    assert comptes.get("reseau_neurones", 0) > 0
+
+
+def test_kpi_hebdomadaires_calcules_avec_des_statuts(demo_complete):
+    """UC16/17 : les KPI de la semaine en cours ont une valeur et un statut, pas seulement
+    ceux de précision (qui exigent un réel plus ancien que la démonstration)."""
+    site_id = demo_complete["site_id"]
+    with transaction() as cur:
+        cur.execute(
+            """SELECT k.famille::text, count(*) AS n,
+                      count(*) FILTER (WHERE v.statut <> 'gris') AS avec_statut
+               FROM kpi_valeurs v JOIN kpi_definitions k ON k.id = v.kpi_id
+               WHERE v.site_id = %s AND v.periodicite = 'semaine' GROUP BY k.famille""",
+            (site_id,),
+        )
+        lignes = {l["famille"]: l for l in cur.fetchall()}
+    assert lignes["rh"]["avec_statut"] > 0
+    assert lignes["couts"]["avec_statut"] > 0
+    assert lignes["service"]["avec_statut"] > 0
+
+
+def test_alertes_de_la_semaine_demo_couvrent_la_situation_racontee(demo_complete):
+    """UC18 : sureffectif (mardi suivant), pénurie d'équipements (chariots en maintenance) et
+    au moins un seuil de KPI dépassé sont tous détectés — la situation du lundi matin
+    n'est pas qu'un artefact du plan, elle déclenche de vraies alertes."""
+    site_id = demo_complete["site_id"]
+    with transaction() as cur:
+        cur.execute(
+            "SELECT type::text, count(*) AS n FROM alertes WHERE site_id = %s GROUP BY type",
+            (site_id,),
+        )
+        comptes = {ligne["type"]: ligne["n"] for ligne in cur.fetchall()}
+    assert comptes.get("sureffectif", 0) > 0
+    assert comptes.get("penurie_equipement", 0) > 0
+    assert comptes.get("seuil_kpi", 0) > 0
+
+
+def test_rapport_hebdomadaire_genere_avec_ses_fichiers(demo_complete):
+    """UC23 : un rapport PDF et Excel existe pour la semaine en cours, prêt à consulter dès
+    l'ouverture de l'écran Rapports."""
+    from app.config import DOSSIER_RAPPORTS
+
+    site_id = demo_complete["site_id"]
+    with transaction() as cur:
+        cur.execute(
+            """SELECT chemin_pdf, chemin_excel FROM rapports
+               WHERE site_id = %s ORDER BY date_generation DESC LIMIT 1""",
+            (site_id,),
+        )
+        rapport = cur.fetchone()
+    assert rapport is not None
+    assert (DOSSIER_RAPPORTS / rapport["chemin_pdf"]).is_file()
+    assert (DOSSIER_RAPPORTS / rapport["chemin_excel"]).is_file()
