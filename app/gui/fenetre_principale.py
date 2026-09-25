@@ -143,6 +143,9 @@ class Application:
                 text="Données de démonstration — ce jeu de données est fictif et sert "
                 "uniquement à rejouer la situation du lundi.",
             ).pack(side="left")
+            fermer = ttk.Label(cadre, text="✕", style="Demo.TLabel", cursor="hand2")
+            fermer.pack(side="right")
+            fermer.bind("<Button-1>", lambda _evt: cadre.destroy())
 
     def _construire_navigation(self, parent: ttk.Frame) -> None:
         cadre = ttk.Frame(parent, style="Navigation.TFrame", width=230)
