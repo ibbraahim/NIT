@@ -115,6 +115,31 @@ vérifie qu'aucun identifiant n'est accentué et qu'aucun texte d'interface n'es
 `tests/test_generateur_demo.py` rejoue bout en bout le scénario du lundi matin (historique,
 prévisions, plan de charge, comparaisons, KPI, alertes et rapport) et sert de test d'acceptation.
 
+## Sauvegarde et restauration
+
+La base contient les plans validés et l'historique : elle doit être sauvegardée régulièrement,
+indépendamment de tout code applicatif.
+
+**Sauvegarde** (produit un fichier compressé, sans bloquer les utilisateurs connectés) :
+
+```bash
+pg_dump --host=<hote> --port=<port> --username=planif_app --format=custom \
+    --file=planification_233_$(date +%Y%m%d).dump planification_233
+```
+
+**Restauration** vers une base vide (existante ou recréée avec `python -m app.bd.init_bd`,
+sans `--demo`) :
+
+```bash
+pg_restore --host=<hote> --port=<port> --username=planif_app --dbname=planification_233 \
+    --clean --if-exists planification_233_20260101.dump
+```
+
+`--clean --if-exists` supprime les objets existants avant de les recréer à partir de la
+sauvegarde ; sans base vide au préalable, retirez ces deux options pour ne restaurer que ce qui
+manque. Le mot de passe est demandé interactivement, ou fourni via la variable d'environnement
+`PGPASSWORD`.
+
 ## Architecture
 
 Trois couches strictement séparées (les services n'importent jamais Tkinter, l'interface

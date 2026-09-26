@@ -17,7 +17,7 @@ from app.bd.depots.previsions import DepotPrevisionsVolume
 from app.bd.depots.previsions_ressources import DepotPrevisionsRessources
 from app.bd.depots.referentiels import DepotReferentiels
 from app.contexte import Contexte
-from app.erreurs import DonneesInvalides, OperationImpossible
+from app.erreurs import ConflitMiseAJour, DonneesInvalides, OperationImpossible
 from app.journal import journal
 from app.libelles import METHODES_COURTES, STATUTS_PLAN
 from app.ml import prediction, preparation
@@ -425,8 +425,19 @@ def _valider_lignes_saisies(lignes: list[dict]) -> tuple[list[dict], dict[str, s
     return propres, erreurs
 
 
-def enregistrer_brouillon_plan(ctx: Contexte, plan_id: int, lignes: list[dict]) -> None:
-    """UC12 : enregistre les ajustements du planificateur (le plan reste en brouillon)."""
+def enregistrer_brouillon_plan(
+    ctx: Contexte,
+    plan_id: int,
+    lignes: list[dict],
+    date_maj_attendue: datetime | None = None,
+) -> None:
+    """UC12 : enregistre les ajustements du planificateur (le plan reste en brouillon).
+
+    ``date_maj_attendue`` porte le verrouillage optimiste : si elle est fournie et ne
+    correspond plus à la date de dernière modification en base, quelqu'un d'autre a modifié
+    le plan entre-temps et l'enregistrement est refusé plutôt que d'écraser silencieusement
+    son travail (``ConflitMiseAJour``).
+    """
     verifier_droit(ctx, "UC12")
     with transaction() as cur:
         depot = DepotPlansCharge(cur)
@@ -435,11 +446,14 @@ def enregistrer_brouillon_plan(ctx: Contexte, plan_id: int, lignes: list[dict]) 
             raise OperationImpossible("Plan de charge introuvable.")
         verifier_site(ctx, plan["site_id"])
         _plan_modifiable(plan)
+        if date_maj_attendue is not None and plan["date_maj"] != date_maj_attendue:
+            raise ConflitMiseAJour()
         propres, erreurs = _valider_lignes_saisies(lignes)
         if erreurs:
             raise DonneesInvalides("Certaines cellules du plan sont invalides.", erreurs)
-        if plan["statut"] == "rejete":
-            depot.mettre_a_jour_plan(plan_id, statut="brouillon")
+        depot.mettre_a_jour_plan(
+            plan_id, statut="brouillon" if plan["statut"] == "rejete" else plan["statut"]
+        )
         depot.mettre_a_jour_lignes(plan_id, propres)
     _log.info("Brouillon du plan n° %s enregistré par %s.", plan_id, ctx.identifiant)
 

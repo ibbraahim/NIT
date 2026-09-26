@@ -69,3 +69,12 @@ class OperationAnnulee(ErreurApplication):
     """Traitement long interrompu par l'utilisateur."""
 
     message_defaut = "Traitement annulé par l'utilisateur."
+
+
+class ConflitMiseAJour(ErreurApplication):
+    """Un autre utilisateur a modifié la même ressource entre la lecture et l'enregistrement."""
+
+    message_defaut = (
+        "Ce plan a été modifié par quelqu'un d'autre entre-temps. "
+        "La semaine a été rechargée ; vérifiez vos saisies avant de les enregistrer à nouveau."
+    )

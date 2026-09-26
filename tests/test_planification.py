@@ -9,7 +9,7 @@ import pytest
 
 from app.bd.connexion import transaction
 from app.bd.depots.previsions import DepotPrevisionsVolume
-from app.erreurs import AccesRefuse, DonneesInvalides, OperationImpossible
+from app.erreurs import AccesRefuse, ConflitMiseAJour, DonneesInvalides, OperationImpossible
 from app.services import admin, modeles, planification
 from app.utils.dates import jours_semaine, lundi_de
 from tests.test_modeles import _inserer_historique
@@ -240,6 +240,55 @@ def test_enregistrer_brouillon_met_a_jour_les_cellules(ctx_planificateur, semain
     )
     assert modifiee["effectif_planifie"] == 12
     assert modifiee["commentaire"] == "Ajustement manuel."
+
+
+def test_enregistrer_brouillon_conflit_si_modifie_entre_temps(
+    ctx_planificateur, semaine_avec_previsions
+):
+    """Verrouillage optimiste : un enregistrement basé sur une version périmée du plan (par
+    exemple parce qu'un autre planificateur l'a modifié entre-temps) est refusé plutôt que
+    d'écraser silencieusement ce changement."""
+    site_id, _zone_id, lundi = semaine_avec_previsions
+    resultat = planification.proposer_plan_charge(ctx_planificateur, site_id, lundi)
+    plan_id = resultat["plan_id"]
+    ligne = planification.lire_plan_charge(ctx_planificateur, site_id, lundi)["lignes"][0]
+    date_maj_perimee = planification.lire_plan_charge(ctx_planificateur, site_id, lundi)["plan"][
+        "date_maj"
+    ]
+
+    # Une première sauvegarde fait avancer date_maj...
+    planification.enregistrer_brouillon_plan(
+        ctx_planificateur,
+        plan_id,
+        [
+            {
+                "zone_id": ligne["zone_id"],
+                "date_jour": ligne["date_jour"],
+                "effectif_planifie": 5,
+                "interim_planifie": 0,
+                "equipements_planifies": 1,
+                "commentaire": "",
+            }
+        ],
+    )
+
+    # ...donc une deuxième sauvegarde qui se croit toujours sur l'ancienne version est refusée.
+    with pytest.raises(ConflitMiseAJour):
+        planification.enregistrer_brouillon_plan(
+            ctx_planificateur,
+            plan_id,
+            [
+                {
+                    "zone_id": ligne["zone_id"],
+                    "date_jour": ligne["date_jour"],
+                    "effectif_planifie": 9,
+                    "interim_planifie": 0,
+                    "equipements_planifies": 1,
+                    "commentaire": "",
+                }
+            ],
+            date_maj_perimee,
+        )
 
 
 def test_enregistrer_brouillon_valeurs_invalides(ctx_planificateur, semaine_avec_previsions):

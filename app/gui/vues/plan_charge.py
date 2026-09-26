@@ -6,7 +6,7 @@ import tkinter as tk
 from datetime import date, timedelta
 from tkinter import ttk
 
-from app.erreurs import DonneesInvalides, ErreurApplication
+from app.erreurs import ConflitMiseAJour, DonneesInvalides, ErreurApplication
 from app.gui.style import COULEURS
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
@@ -366,8 +366,15 @@ class VuePlanCharge(Vue):
         if self.plan_donnees is None:
             return
         plan_id = self.plan_donnees["plan"]["id"]
+        date_maj = self.plan_donnees["plan"]["date_maj"]
         try:
-            planification.enregistrer_brouillon_plan(self.ctx, plan_id, self._lignes_saisies())
+            planification.enregistrer_brouillon_plan(
+                self.ctx, plan_id, self._lignes_saisies(), date_maj
+            )
+        except ConflitMiseAJour as exc:
+            self.charger_semaine()
+            afficher_erreur(self, exc.message)
+            return
         except DonneesInvalides as exc:
             afficher_erreur(self, exc.message)
             return
@@ -381,9 +388,16 @@ class VuePlanCharge(Vue):
         if self.plan_donnees is None:
             return
         plan_id = self.plan_donnees["plan"]["id"]
+        date_maj = self.plan_donnees["plan"]["date_maj"]
         try:
-            planification.enregistrer_brouillon_plan(self.ctx, plan_id, self._lignes_saisies())
+            planification.enregistrer_brouillon_plan(
+                self.ctx, plan_id, self._lignes_saisies(), date_maj
+            )
             planification.soumettre_plan(self.ctx, plan_id)
+        except ConflitMiseAJour as exc:
+            self.charger_semaine()
+            afficher_erreur(self, exc.message)
+            return
         except DonneesInvalides as exc:
             afficher_erreur(self, exc.message)
             return
