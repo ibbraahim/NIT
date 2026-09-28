@@ -10,12 +10,15 @@ import threading
 from pathlib import Path
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    Image,
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -23,7 +26,11 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from app.config import DOSSIER_POLICES
+from app import ACCROCHE
+from app.config import DOSSIER_IMAGES, DOSSIER_POLICES
+
+#: Couleur d'accent de marque Workly (milieu du dégradé — voir app.gui.style).
+COULEUR_ACCENT_MARQUE = colors.HexColor("#4C6CF0")
 
 POLICE = "DejaVuSans"
 POLICE_GRAS = "DejaVuSans-Bold"
@@ -76,6 +83,7 @@ def _ecrire(
     style_vide = ParagraphStyle("Vide", fontName=POLICE, fontSize=10, textColor=colors.grey)
 
     elements = [
+        *_page_de_garde(titre, sous_titre),
         Paragraph(_echapper(titre), style_titre),
         Paragraph(_echapper(sous_titre), style_sous_titre),
     ]
@@ -122,6 +130,46 @@ def _ecrire(
         title=titre,
     )
     document.build(elements)
+
+
+def _page_de_garde(titre: str, sous_titre: str) -> list:
+    """Page de garde Workly : logo, accroche, titre et sous-titre du rapport, sur sa propre
+    page (avant le contenu, qui répète titre et sous-titre pour rester lisible seule)."""
+    chemin_logo = DOSSIER_IMAGES / "logo_workly_horizontal.png"
+    style_accroche = ParagraphStyle(
+        "Accroche",
+        fontName=POLICE,
+        fontSize=12,
+        textColor=COULEUR_ACCENT_MARQUE,
+        alignment=TA_CENTER,
+        spaceAfter=48,
+    )
+    style_titre_garde = ParagraphStyle(
+        "TitreGarde",
+        fontName=POLICE_GRAS,
+        fontSize=22,
+        leading=27,
+        alignment=TA_CENTER,
+        spaceAfter=10,
+    )
+    style_sous_titre_garde = ParagraphStyle(
+        "SousTitreGarde",
+        fontName=POLICE,
+        fontSize=12,
+        textColor=colors.grey,
+        alignment=TA_CENTER,
+    )
+    elements: list = [Spacer(1, 5 * cm)]
+    if chemin_logo.exists():
+        image = Image(str(chemin_logo), width=8 * cm, height=4 * cm)
+        image.hAlign = "CENTER"
+        elements.append(image)
+    elements.append(Spacer(1, 0.6 * cm))
+    elements.append(Paragraph(_echapper(ACCROCHE), style_accroche))
+    elements.append(Paragraph(_echapper(titre), style_titre_garde))
+    elements.append(Paragraph(_echapper(sous_titre), style_sous_titre_garde))
+    elements.append(PageBreak())
+    return elements
 
 
 def _echapper(texte: str) -> str:

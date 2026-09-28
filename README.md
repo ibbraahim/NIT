@@ -1,4 +1,4 @@
-# Planification RH et équipements — CSCMP 2.3.3
+# Workly — Planification · Ressources · Performance
 
 Application de bureau (Python, Tkinter, PostgreSQL) qui traduit la prévision de volume en
 ressources nécessaires — heures de main-d'œuvre, effectifs et équipements — par site, zone et

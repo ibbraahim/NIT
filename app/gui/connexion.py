@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
-from app import NOM_APPLICATION, VERSION
+from app import ACCROCHE, NOM_APPLICATION, VERSION
+from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
+from app.gui.style import COULEUR_FOND_MARQUE
 from app.gui.widgets.champs import ChampTexte
 from app.journal import journal
 from app.services import auth
@@ -16,45 +19,47 @@ _log = journal(__name__)
 
 
 class EcranConnexion(ttk.Frame):
-    """Formulaire Identifiant / Mot de passe ; boutons « Se connecter » et « Quitter »."""
+    """Fond aux couleurs de la marque Workly ; formulaire Identifiant / Mot de passe ;
+    boutons « Se connecter » et « Quitter »."""
 
     def __init__(
         self, parent, sur_connexion: Callable[[Contexte], None], sur_quitter: Callable[[], None]
     ) -> None:
-        super().__init__(parent)
+        super().__init__(parent, style="Marque.TFrame")
         self.sur_connexion = sur_connexion
-        carte = ttk.Frame(self, style="Carte.TFrame", padding=32)
+        carte = ttk.Frame(self, style="Marque.TFrame", padding=32)
         carte.place(relx=0.5, rely=0.45, anchor="center")
-        ttk.Label(carte, text=NOM_APPLICATION, style="Titre.TLabel", background="#ffffff").grid(
-            row=0, column=0, columnspan=2, sticky="w"
+
+        self._logo = tk.PhotoImage(file=str(DOSSIER_IMAGES / "logo_workly_88.png"))
+        ttk.Label(carte, image=self._logo, background=COULEUR_FOND_MARQUE).grid(
+            row=0, column=0, columnspan=2, pady=(0, 12)
         )
-        ttk.Label(
-            carte,
-            text="Traduire la prévision de volume en ressources : heures, "
-            "effectifs et équipements.",
-            style="Aide.TLabel",
-            background="#ffffff",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 18))
-        self.identifiant = ChampTexte(carte, "Identifiant", largeur=34, style_cadre="Carte.TFrame")
-        self.identifiant.grid(row=2, column=0, columnspan=2, sticky="we")
+        ttk.Label(carte, text=NOM_APPLICATION, style="MarqueTitre.TLabel").grid(
+            row=1, column=0, columnspan=2
+        )
+        ttk.Label(carte, text=ACCROCHE, style="MarqueAccroche.TLabel").grid(
+            row=2, column=0, columnspan=2, pady=(2, 24)
+        )
+        self.identifiant = ChampTexte(carte, "Identifiant", largeur=34, style_cadre="Marque.TFrame")
+        self.identifiant.grid(row=3, column=0, columnspan=2, sticky="we")
         self.mot_de_passe = ChampTexte(
-            carte, "Mot de passe", largeur=34, masque=True, style_cadre="Carte.TFrame"
+            carte, "Mot de passe", largeur=34, masque=True, style_cadre="Marque.TFrame"
         )
-        self.mot_de_passe.grid(row=3, column=0, columnspan=2, sticky="we", pady=(8, 0))
+        self.mot_de_passe.grid(row=4, column=0, columnspan=2, sticky="we", pady=(8, 0))
         self.message = ttk.Label(
-            carte, text="", style="Erreur.TLabel", wraplength=320, background="#ffffff"
+            carte, text="", style="Erreur.TLabel", wraplength=320, background=COULEUR_FOND_MARQUE
         )
-        self.message.grid(row=4, column=0, columnspan=2, sticky="w", pady=(10, 0))
-        boutons = ttk.Frame(carte, style="Surface.TFrame")
-        boutons.grid(row=5, column=0, columnspan=2, sticky="e", pady=(16, 0))
+        self.message.grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        boutons = ttk.Frame(carte, style="Marque.TFrame")
+        boutons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(16, 0))
         self.bouton_quitter = ttk.Button(boutons, text="Quitter", command=sur_quitter)
         self.bouton_quitter.pack(side="right")
         self.bouton_connexion = ttk.Button(
             boutons, text="Se connecter", style="Primaire.TButton", command=self.se_connecter
         )
         self.bouton_connexion.pack(side="right", padx=(0, 8))
-        ttk.Label(carte, text=f"Version {VERSION}", style="Aide.TLabel", background="#ffffff").grid(
-            row=6, column=0, sticky="w", pady=(18, 0)
+        ttk.Label(carte, text=f"Version {VERSION}", style="MarqueAide.TLabel").grid(
+            row=7, column=0, sticky="w", pady=(18, 0)
         )
         for champ in (self.identifiant, self.mot_de_passe):
             champ.saisie.bind("<Return>", lambda _e: self.se_connecter())

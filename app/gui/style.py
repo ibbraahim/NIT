@@ -29,6 +29,21 @@ COULEURS = {
     "desactive": "#a4acb6",
 }
 
+#: Identité de marque Workly : fond sombre réservé au bandeau, à l'écran de connexion, à
+#: l'écran « À propos » et à la page de garde des rapports ; dégradé d'accent (début → milieu
+#: → fin) pour les boutons principaux, les en-têtes de graphiques, les barres de progression et
+#: les éléments actifs du menu. Le reste de l'interface (formulaires, tableaux, écrans de
+#: travail) garde le thème clair ci-dessous.
+COULEUR_FOND_MARQUE = "#0A1128"
+COULEUR_ACCENT_DEBUT = "#2FA8F5"
+COULEUR_ACCENT_MILIEU = "#4C6CF0"
+COULEUR_ACCENT_FIN = "#7B4AE2"
+#: Une seule application ttk (boutons, barres de progression…) ne peut pas peindre un véritable
+#: dégradé multi-couleurs : c'est cette teinte représentative, tirée du milieu du dégradé, qui
+#: sert de couleur d'accent partout où ttk l'exige. Les zones de marque à surface fixe (bandeau
+#: de connexion, page de garde PDF) utilisent, elles, le vrai dégradé rendu en image.
+COULEUR_ACCENT = COULEUR_ACCENT_MILIEU
+
 #: Couleur associée à chaque statut de KPI ou niveau d'alerte.
 COULEURS_STATUT = {
     "vert": COULEURS["vert"],
@@ -94,23 +109,56 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
             font=(famille, TAILLE_POLICE, "bold"),
         )
 
-    # Bandeau supérieur
-    style.configure("Bandeau.TFrame", background=c["primaire"])
-    style.configure("Bandeau.TLabel", background=c["primaire"], foreground="#ffffff")
+    # Bandeau supérieur (fond sombre de marque)
+    style.configure("Bandeau.TFrame", background=COULEUR_FOND_MARQUE)
+    style.configure("Bandeau.TLabel", background=COULEUR_FOND_MARQUE, foreground="#ffffff")
     style.configure(
         "BandeauTitre.TLabel",
-        background=c["primaire"],
+        background=COULEUR_FOND_MARQUE,
         foreground="#ffffff",
-        font=(famille, 13, "bold"),
+        font=(famille, 15, "bold"),
+    )
+    style.configure(
+        "BandeauRepere.TLabel",
+        background=COULEUR_FOND_MARQUE,
+        foreground=COULEUR_ACCENT_DEBUT,
+        font=(famille, 9),
     )
     style.configure(
         "Bandeau.TButton",
-        background=c["primaire_fonce"],
+        background=COULEUR_ACCENT_MILIEU,
         foreground="#ffffff",
-        bordercolor=c["primaire_fonce"],
+        bordercolor=COULEUR_ACCENT_MILIEU,
         padding=(10, 4),
     )
-    style.map("Bandeau.TButton", background=[("active", c["primaire_clair"])])
+    style.map("Bandeau.TButton", background=[("active", COULEUR_ACCENT_FIN)])
+
+    # Écrans de marque (connexion, À propos) : fond sombre
+    style.configure("Marque.TFrame", background=COULEUR_FOND_MARQUE)
+    style.configure(
+        "MarqueTitre.TLabel",
+        background=COULEUR_FOND_MARQUE,
+        foreground="#ffffff",
+        font=(famille, 22, "bold"),
+    )
+    style.configure(
+        "MarqueAccroche.TLabel",
+        background=COULEUR_FOND_MARQUE,
+        foreground=COULEUR_ACCENT_DEBUT,
+        font=(famille, 11),
+    )
+    style.configure(
+        "MarqueAide.TLabel",
+        background=COULEUR_FOND_MARQUE,
+        foreground="#9aa4c2",
+        font=(famille, 9),
+    )
+    style.configure(
+        "MarqueEtiquette.TLabel",
+        background=COULEUR_FOND_MARQUE,
+        foreground="#ffffff",
+        font=(famille, TAILLE_POLICE),
+    )
     style.configure("Demo.TFrame", background=c["demo"])
     style.configure(
         "Demo.TLabel",
@@ -144,18 +192,28 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     )
     style.configure(
         "Primaire.TButton",
-        background=c["primaire"],
+        background=COULEUR_ACCENT_MILIEU,
         foreground="#ffffff",
-        bordercolor=c["primaire"],
+        bordercolor=COULEUR_ACCENT_MILIEU,
     )
     style.map(
         "Primaire.TButton",
-        background=[("disabled", c["gris_clair"]), ("active", c["primaire_clair"])],
+        background=[("disabled", c["gris_clair"]), ("active", COULEUR_ACCENT_FIN)],
         foreground=[("disabled", c["desactive"])],
     )
 
     # Champs de saisie (normal et en erreur)
     style.configure("TEntry", fieldbackground=c["surface"], padding=3)
+    style.configure(
+        "Marque.TEntry",
+        fieldbackground="#16204a",
+        foreground="#ffffff",
+        insertcolor="#ffffff",
+        bordercolor=COULEUR_ACCENT_MILIEU,
+        lightcolor="#16204a",
+        darkcolor="#16204a",
+        padding=3,
+    )
     style.configure(
         "Erreur.TEntry",
         fieldbackground="#fff6f6",
@@ -209,20 +267,20 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         foreground=[("selected", "#ffffff")],
     )
 
-    # Menu de navigation
+    # Menu de navigation (éléments actifs dans l'accent de marque)
     style.configure(
         "Navigation.Treeview",
-        background=c["primaire_fonce"],
-        fieldbackground=c["primaire_fonce"],
+        background=COULEUR_FOND_MARQUE,
+        fieldbackground=COULEUR_FOND_MARQUE,
         foreground="#ffffff",
         rowheight=36,
         font=(famille, 11),
         borderwidth=0,
     )
-    style.map("Navigation.Treeview", background=[("selected", c["primaire_clair"])])
+    style.map("Navigation.Treeview", background=[("selected", COULEUR_ACCENT_MILIEU)])
     style.layout("Navigation.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
-    style.configure("Navigation.TFrame", background=c["primaire_fonce"])
+    style.configure("Navigation.TFrame", background=COULEUR_FOND_MARQUE)
 
     # Barres de progression
-    style.configure("TProgressbar", background=c["primaire"], troughcolor=c["gris_clair"])
+    style.configure("TProgressbar", background=COULEUR_ACCENT_MILIEU, troughcolor=c["gris_clair"])
     return style

@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from datetime import date
 from tkinter import ttk
 
-from app.gui.style import COULEURS
+from app.gui.style import COULEUR_FOND_MARQUE, COULEURS
 from app.utils.format_fr import formater_date, formater_nombre, lire_date, lire_nombre
 
 
@@ -21,16 +21,33 @@ class Champ(ttk.Frame):
     style_erreur = "Erreur.TEntry"
 
     def __init__(self, parent, libelle: str, aide: str = "", **options) -> None:
-        sur_carte = options.pop("style_cadre", "TFrame") in ("Carte.TFrame", "Surface.TFrame")
-        super().__init__(parent, style="Surface.TFrame" if sur_carte else "TFrame")
-        fond = {"background": COULEURS["surface"]} if sur_carte else {}
+        style_cadre = options.pop("style_cadre", "TFrame")
+        sur_carte = style_cadre in ("Carte.TFrame", "Surface.TFrame")
+        sur_marque = style_cadre == "Marque.TFrame"
+        style_trame = (
+            "Surface.TFrame" if sur_carte else ("Marque.TFrame" if sur_marque else "TFrame")
+        )
+        super().__init__(parent, style=style_trame)
+        if sur_marque:
+            fond = {"background": COULEUR_FOND_MARQUE}
+            style_etiquette, style_aide = "MarqueEtiquette.TLabel", "MarqueAide.TLabel"
+        elif sur_carte:
+            fond = {"background": COULEURS["surface"]}
+            style_etiquette, style_aide = "TLabel", "Aide.TLabel"
+        else:
+            fond = {}
+            style_etiquette, style_aide = "TLabel", "Aide.TLabel"
         self.libelle = libelle
-        self.etiquette = ttk.Label(self, text=libelle, **fond)
+        self.etiquette = ttk.Label(self, text=libelle, style=style_etiquette, **fond)
         self.etiquette.grid(row=0, column=0, sticky="w")
         self.saisie = self._creer_saisie(**options)
         self.saisie.grid(row=1, column=0, sticky="we", pady=(2, 0))
-        self.message = ttk.Label(self, text=aide, style="Aide.TLabel", wraplength=320, **fond)
+        if sur_marque and isinstance(self.saisie, ttk.Entry):
+            self.style_normal = "Marque.TEntry"
+            self.saisie.configure(style=self.style_normal)
+        self.message = ttk.Label(self, text=aide, style=style_aide, wraplength=320, **fond)
         self._aide = aide
+        self._style_aide = style_aide
         self.message.grid(row=2, column=0, sticky="w")
         self.columnconfigure(0, weight=1)
 
@@ -45,7 +62,7 @@ class Champ(ttk.Frame):
     def effacer_erreur(self) -> None:
         """Rétablit l'apparence normale du champ."""
         self.saisie.configure(style=self.style_normal)
-        self.message.configure(text=self._aide, style="Aide.TLabel")
+        self.message.configure(text=self._aide, style=self._style_aide)
 
     def activer(self, actif: bool) -> None:
         """Active ou grise la saisie."""

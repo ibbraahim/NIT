@@ -5,8 +5,9 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from app import NOM_APPLICATION, VERSION
-from app.gui.style import COULEURS
+from app import ACCROCHE, NOM_APPLICATION, REPERE_TECHNIQUE, VERSION
+from app.config import DOSSIER_IMAGES
+from app.gui.style import COULEUR_ACCENT_DEBUT, COULEUR_FOND_MARQUE
 from app.gui.widgets.dialogues import DialogueBase
 
 SITUATION = (
@@ -62,16 +63,28 @@ CARTOGRAPHIE = [
 
 
 class FenetreAPropos(DialogueBase):
-    """Situation, problème, place du sous-processus 2.3.3 dans le CSCMP, version."""
+    """Fond sombre de marque ; logo, situation, problème, place du sous-processus 2.3.3 dans
+    le CSCMP, version."""
 
     def __init__(self, parent) -> None:
         super().__init__(parent, "À propos", redimensionnable=True)
-        ttk.Label(self.corps, text=NOM_APPLICATION, style="Titre.TLabel").pack(anchor="w")
+        self.configure(background=COULEUR_FOND_MARQUE)
+        self.corps.configure(style="Marque.TFrame")
+        self.barre_boutons.configure(style="Marque.TFrame")
+
+        entete = ttk.Frame(self.corps, style="Marque.TFrame")
+        entete.pack(fill="x", pady=(0, 12))
+        self._logo = tk.PhotoImage(file=str(DOSSIER_IMAGES / "logo_workly_88.png")).subsample(2, 2)
+        ttk.Label(entete, image=self._logo, background=COULEUR_FOND_MARQUE).pack(side="left")
+        textes = ttk.Frame(entete, style="Marque.TFrame")
+        textes.pack(side="left", padx=(12, 0))
+        ttk.Label(textes, text=NOM_APPLICATION, style="MarqueTitre.TLabel").pack(anchor="w")
+        ttk.Label(textes, text=ACCROCHE, style="MarqueAccroche.TLabel").pack(anchor="w")
         ttk.Label(
             self.corps,
-            text=f"Version {VERSION} — projet universitaire de cartographie des "
-            "processus Supply Chain (référentiel CSCMP)",
-            style="Aide.TLabel",
+            text=f"{REPERE_TECHNIQUE} — version {VERSION} — projet universitaire de "
+            "cartographie des processus Supply Chain (référentiel CSCMP)",
+            style="MarqueAide.TLabel",
         ).pack(anchor="w", pady=(0, 10))
         texte = tk.Text(
             self.corps,
@@ -79,7 +92,8 @@ class FenetreAPropos(DialogueBase):
             height=28,
             wrap="word",
             relief="flat",
-            background=COULEURS["surface"],
+            background="#111a3d",
+            foreground="#e8ebf5",
             padx=12,
             pady=10,
             borderwidth=0,
@@ -89,13 +103,17 @@ class FenetreAPropos(DialogueBase):
         texte.pack(side="left", fill="both", expand=True)
         defil.pack(side="left", fill="y")
         texte.tag_configure(
-            "titre", font=("", 12, "bold"), foreground=COULEURS["primaire"], spacing1=10, spacing3=4
+            "titre",
+            font=("", 12, "bold"),
+            foreground=COULEUR_ACCENT_DEBUT,
+            spacing1=10,
+            spacing3=4,
         )
         texte.tag_configure("corps", spacing2=2, spacing3=6)
         texte.tag_configure("niveau0", lmargin1=8, lmargin2=8, font=("", 10, "bold"))
         texte.tag_configure("niveau1", lmargin1=28, lmargin2=40)
         texte.tag_configure("niveau2", lmargin1=48, lmargin2=60)
-        texte.tag_configure("focus", foreground=COULEURS["rouge"], font=("", 10, "bold"))
+        texte.tag_configure("focus", foreground="#ff8a80", font=("", 10, "bold"))
         for titre, contenu in (
             ("La situation", SITUATION),
             ("Le problème", PROBLEME),

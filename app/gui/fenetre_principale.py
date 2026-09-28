@@ -6,11 +6,12 @@ import tkinter as tk
 from datetime import date, datetime
 from tkinter import ttk
 
-from app import NOM_APPLICATION
+from app import NOM_APPLICATION, REPERE_TECHNIQUE
+from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
 from app.gui.connexion import EcranConnexion
-from app.gui.style import COULEURS, appliquer_style
+from app.gui.style import COULEUR_FOND_MARQUE, COULEURS, appliquer_style
 from app.gui.vues import ACCUEIL, ecran, ecrans_autorises
 from app.gui.widgets.dialogues import afficher_erreur, franciser_tk
 from app.journal import journal
@@ -29,6 +30,7 @@ class Application:
     def __init__(self, racine: tk.Tk | None = None) -> None:
         self.racine = racine or tk.Tk()
         self.racine.title(NOM_APPLICATION)
+        self._definir_icone()
         appliquer_style(self.racine)
         franciser_tk(self.racine)
         largeur = min(LARGEUR_MIN, self.racine.winfo_screenwidth())
@@ -105,6 +107,17 @@ class Application:
     # ------------------------------------------------------------------
     # Structure de la fenêtre
     # ------------------------------------------------------------------
+    def _definir_icone(self) -> None:
+        """Icône de la fenêtre (barre de titre / barre des tâches) : logo Workly."""
+        try:
+            self.racine.iconbitmap(str(DOSSIER_IMAGES / "logo_workly.ico"))
+        except tk.TclError:
+            try:
+                self._icone = tk.PhotoImage(file=str(DOSSIER_IMAGES / "logo_workly_88.png"))
+                self.racine.iconphoto(True, self._icone)
+            except tk.TclError:
+                _log.warning("Icône de fenêtre indisponible.")
+
     def _construire_menu_aide(self) -> None:
         barre = tk.Menu(self.racine, tearoff=False)
         aide = tk.Menu(barre, tearoff=False)
@@ -115,7 +128,17 @@ class Application:
     def _construire_bandeau(self) -> None:
         bandeau = ttk.Frame(self._cadre, style="Bandeau.TFrame", padding=(16, 10))
         bandeau.pack(fill="x")
-        ttk.Label(bandeau, text=NOM_APPLICATION, style="BandeauTitre.TLabel").pack(side="left")
+        if not hasattr(self, "_logo_bandeau"):
+            self._logo_bandeau = tk.PhotoImage(
+                file=str(DOSSIER_IMAGES / "logo_workly_88.png")
+            ).subsample(2, 2)
+        ttk.Label(bandeau, image=self._logo_bandeau, background=COULEUR_FOND_MARQUE).pack(
+            side="left", padx=(0, 10)
+        )
+        textes = ttk.Frame(bandeau, style="Bandeau.TFrame")
+        textes.pack(side="left")
+        ttk.Label(textes, text=NOM_APPLICATION, style="BandeauTitre.TLabel").pack(anchor="w")
+        ttk.Label(textes, text=REPERE_TECHNIQUE, style="BandeauRepere.TLabel").pack(anchor="w")
         ttk.Button(
             bandeau, text="Se déconnecter", style="Bandeau.TButton", command=self.se_deconnecter
         ).pack(side="right")
