@@ -20,20 +20,22 @@ from app.utils.format_fr import formater_nombre
 OPTION_TOUTE_FAMILLE = (None, "Toutes les familles")
 OPTIONS_FAMILLE = [OPTION_TOUTE_FAMILLE] + list(FAMILLES_KPI.items())
 OPTIONS_PERIODICITE = list(PERIODICITES.items())
+OPTION_TOUS_SITES = (None, "Tous les sites (cible générale)")
+OPTION_TOUTES_ZONES_SITE = (None, "Toutes les zones du site")
 
 COLONNES_TABLEAU = [
-    Colonne("famille_libelle", "Famille", 130),
     Colonne("kpi_libelle", "KPI", 220),
+    Colonne("famille_libelle", "Famille", 130),
     Colonne("methode_libelle", "Méthode", 70, "center"),
     Colonne("valeur_affichee", "Valeur", 110, "e"),
     Colonne("cible_affichee", "Cible", 110, "e"),
-    Colonne("tendance", "Tendance", 70, "center"),
     Colonne("statut_libelle", "Statut", 100, "center"),
+    Colonne("tendance", "Tendance", 70, "center"),
 ]
 
 COLONNES_CIBLES = [
     Colonne("kpi_code", "KPI", 100),
-    Colonne("portee", "Portée", 160),
+    Colonne("portee", "Portée", 200),
     Colonne("periodicite_libelle", "Périodicité", 100),
     Colonne("valeur_cible", "Cible", 90, "e", formateur=lambda v: formater_nombre(v, 2)),
     Colonne("seuil_orange", "Seuil orange", 100, "e", formateur=lambda v: formater_nombre(v, 2)),
@@ -53,17 +55,40 @@ def _etiquette_statut(ligne: dict) -> str | None:
 
 
 class VueKpiCibles(Vue):
-    """Filtres Site/Zone/Périodicité/Date, calcul (UC16/UC17), tableau des KPI, gestion des
-    cibles (UC15)."""
+    """Onglets « Suivi des KPI » (UC16/UC17) et « Cibles » (UC15)."""
 
     titre = "KPI et cibles"
     sous_titre = "Suivi des 20 indicateurs et de leurs objectifs"
 
     def construire(self) -> None:
-        self.peut_calculer = a_le_droit(self.ctx, "UC17")
-        self.peut_definir_cibles = a_le_droit(self.ctx, "UC15")
+        self.onglets = ttk.Notebook(self.contenu)
+        self.onglets.pack(fill="both", expand=True)
+        self.page_suivi = OngletSuiviKpi(self.onglets, self)
+        self.onglets.add(self.page_suivi, text="Suivi des KPI")
+        self.page_cibles = OngletCibles(self.onglets, self)
+        self.onglets.add(self.page_cibles, text="Cibles")
 
-        barre = ttk.Frame(self.contenu)
+    def actualiser(self) -> None:
+        self.page_suivi.actualiser()
+        self.page_cibles.actualiser()
+
+
+# =====================================================================
+# Onglet « Suivi des KPI » (UC16, UC17)
+# =====================================================================
+class OngletSuiviKpi(ttk.Frame):
+    """Filtres Site/Zone/Périodicité/Date, bouton de calcul, tableau des KPI."""
+
+    def __init__(self, parent, vue: VueKpiCibles) -> None:
+        super().__init__(parent, padding=(0, 12))
+        self.vue = vue
+        self.ctx = vue.ctx
+        self.peut_calculer = a_le_droit(self.ctx, "UC17")
+        self._lignes: list[dict] = []
+        self._construire()
+
+    def _construire(self) -> None:
+        barre = ttk.Frame(self)
         barre.pack(fill="x", pady=(0, 10))
         self.site = ChampListe(barre, "Site", largeur=22)
         self.site.pack(side="left")
@@ -80,7 +105,7 @@ class VueKpiCibles(Vue):
         self.date_reference.pack(side="left", padx=(16, 0))
         self.date_reference.sur_changement(self.actualiser_donnees)
 
-        barre2 = ttk.Frame(self.contenu)
+        barre2 = ttk.Frame(self)
         barre2.pack(fill="x", pady=(0, 10))
         self.famille = ChampListe(barre2, "Famille", options=OPTIONS_FAMILLE, largeur=22)
         self.famille.pack(side="left")
@@ -88,38 +113,32 @@ class VueKpiCibles(Vue):
 
         boutons = ttk.Frame(barre2)
         boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
-        self.b_calculer = Bouton(boutons, "Calculer les KPI", self.calculer, primaire=True)
+        self.b_calculer = Bouton(
+            boutons, "Calculer et comparer maintenant", self.calculer, primaire=True
+        )
         self.b_calculer.pack(side="left")
         if not self.peut_calculer:
             self.b_calculer.pack_forget()
-        self.b_cibles = Bouton(boutons, "Gérer les cibles…", self.ouvrir_cibles)
-        self.b_cibles.pack(side="left", padx=(8, 0))
-        if not self.peut_definir_cibles:
-            self.b_cibles.pack_forget()
 
-        corps = ttk.Frame(self.contenu)
+        corps = ttk.Frame(self)
         corps.pack(fill="both", expand=True)
         self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=16)
         self.tableau.pack(fill="both", expand=True)
-        self._lignes: list[dict] = []
 
     def actualiser(self) -> None:
-        sites = self.executer(lambda: admin.lister_sites(self.ctx)) or []
+        sites = self.vue.executer(lambda: admin.lister_sites(self.ctx)) or []
         self.site.definir_options([(s["id"], s["nom"]) for s in sites])
         self._sur_changement_site()
 
     def _sur_changement_site(self) -> None:
         site_id = self.site.valeur()
         zones = (
-            self.executer(lambda: admin.lister_zones(self.ctx, site_id)) or []
+            self.vue.executer(lambda: admin.lister_zones(self.ctx, site_id)) or []
             if site_id is not None
             else []
         )
         self.zone.definir_options(
             [(None, "Toutes les zones")] + [(z["id"], z["nom"]) for z in zones], conserver=False
-        )
-        self.b_cibles.activer(
-            self.peut_definir_cibles and site_id is not None, "Choisissez d'abord un site."
         )
         self.actualiser_donnees()
 
@@ -141,7 +160,7 @@ class VueKpiCibles(Vue):
             self._lignes = []
             return
         lignes = (
-            self.executer(
+            self.vue.executer(
                 lambda: kpi.lister_kpi_valeurs(
                     self.ctx, site_id, zone_id, periodicite, date_reference
                 )
@@ -164,7 +183,8 @@ class VueKpiCibles(Vue):
             lignes,
             cle_id="id",
             etiquettes=_etiquette_statut,
-            message_vide="Aucun KPI calculé pour cette période. Utilisez « Calculer les KPI ».",
+            message_vide="Aucun KPI calculé pour cette période. "
+            "Utilisez « Calculer et comparer maintenant ».",
         )
 
     def calculer(self) -> None:
@@ -179,56 +199,55 @@ class VueKpiCibles(Vue):
 
         def succes(_resultat):
             self.actualiser_donnees()
-            informer(self, "KPI calculés et comparés à leurs cibles.", "Calcul terminé")
+            informer(self.vue, "KPI calculés et comparés à leurs cibles.", "Calcul terminé")
 
         executer_en_fond(
-            self, traiter, succes, titre="Calcul des KPI", message="Calcul des indicateurs…"
+            self.vue, traiter, succes, titre="Calcul des KPI", message="Calcul des indicateurs…"
         )
 
-    def ouvrir_cibles(self) -> None:
-        site_id = self.site.valeur()
-        if site_id is None:
-            return
-        FenetreCibles(self, self.ctx, site_id).afficher()
-        self.actualiser_donnees()
-
 
 # =====================================================================
-# UC15 · Gestion des cibles
+# Onglet « Cibles » (UC15)
 # =====================================================================
-class FenetreCibles(DialogueBase):
-    """Liste des cibles applicables au site (générales, du site, par zone) ; Ajouter /
-    Modifier / Supprimer."""
+class OngletCibles(ttk.Frame):
+    """Tableau des objectifs (tous sites) ; Ajouter / Modifier / Supprimer une cible."""
 
-    def __init__(self, parent, ctx, site_id: int) -> None:
-        super().__init__(parent, "Gérer les cibles", redimensionnable=True)
-        self.ctx = ctx
-        self.site_id = site_id
+    def __init__(self, parent, vue: VueKpiCibles) -> None:
+        super().__init__(parent, padding=(0, 12))
+        self.vue = vue
+        self.ctx = vue.ctx
+        self.peut_definir_cibles = a_le_droit(self.ctx, "UC15")
+        self._construire()
 
-        self.tableau = TableauTriable(self.corps, COLONNES_CIBLES, hauteur=12)
+    def _construire(self) -> None:
+        boutons = ttk.Frame(self)
+        boutons.pack(fill="x", pady=(0, 10))
+        self.b_ajouter = Bouton(boutons, "Ajouter une cible", self._ajouter, primaire=True)
+        self.b_ajouter.pack(side="left")
+        self.b_modifier = Bouton(boutons, "Modifier la cible", self._modifier)
+        self.b_modifier.pack(side="left", padx=(8, 0))
+        self.b_modifier.activer(False, "Sélectionnez d'abord une cible.")
+        self.b_supprimer = Bouton(boutons, "Supprimer la cible", self._supprimer)
+        self.b_supprimer.pack(side="left", padx=(8, 0))
+        self.b_supprimer.activer(False, "Sélectionnez d'abord une cible.")
+        if not self.peut_definir_cibles:
+            self.b_ajouter.pack_forget()
+            self.b_modifier.pack_forget()
+            self.b_supprimer.pack_forget()
+
+        corps = ttk.Frame(self)
+        corps.pack(fill="both", expand=True)
+        self.tableau = TableauTriable(corps, COLONNES_CIBLES, hauteur=16)
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection)
 
-        self.ajouter_bouton("Fermer", self.fermer)
-        self.b_supprimer = self.ajouter_bouton("Supprimer la cible sélectionnée", self._supprimer)
-        self.b_supprimer.state(["disabled"])
-        self.b_modifier = self.ajouter_bouton("Modifier la cible sélectionnée", self._modifier)
-        self.b_modifier.state(["disabled"])
-        self.ajouter_bouton("Ajouter une cible", self._ajouter, primaire=True)
-
-        self._charger()
-
     def _sur_selection(self) -> None:
-        actif = self.tableau.ligne_selectionnee() is not None
-        self.b_modifier.state(["!disabled"] if actif else ["disabled"])
-        self.b_supprimer.state(["!disabled"] if actif else ["disabled"])
+        actif = self.peut_definir_cibles and self.tableau.ligne_selectionnee() is not None
+        self.b_modifier.activer(actif, "Sélectionnez d'abord une cible.")
+        self.b_supprimer.activer(actif, "Sélectionnez d'abord une cible.")
 
-    def _charger(self) -> None:
-        try:
-            objectifs = kpi.lister_objectifs(self.ctx, self.site_id)
-        except ErreurApplication as exc:
-            afficher_erreur(self, exc.message)
-            objectifs = []
+    def actualiser(self) -> None:
+        objectifs = self.vue.executer(lambda: kpi.lister_objectifs(self.ctx, None)) or []
         for o in objectifs:
             if o["site_id"] is None:
                 o["portee"] = "Général (tous les sites)"
@@ -238,41 +257,41 @@ class FenetreCibles(DialogueBase):
                 o["portee"] = f"{o['site']} — {o['zone']}"
             o["periodicite_libelle"] = libelle(PERIODICITES, o["periodicite"])
         self.tableau.charger(objectifs, cle_id="id", message_vide="Aucune cible définie.")
+        self._sur_selection()
 
     def _ajouter(self) -> None:
-        if FenetreObjectif(self, self.ctx, self.site_id).afficher():
-            self._charger()
+        if FenetreObjectif(self.vue, self.ctx).afficher():
+            self.actualiser()
 
     def _modifier(self) -> None:
         objectif = self.tableau.ligne_selectionnee()
         if objectif is None:
             return
-        if FenetreObjectif(self, self.ctx, self.site_id, objectif=objectif).afficher():
-            self._charger()
+        if FenetreObjectif(self.vue, self.ctx, objectif=objectif).afficher():
+            self.actualiser()
 
     def _supprimer(self) -> None:
         objectif = self.tableau.ligne_selectionnee()
         if objectif is None:
             return
-        if not confirmer(self, "Supprimer cette cible ?", "Supprimer la cible"):
+        if not confirmer(self.vue, "Supprimer cette cible ?", "Supprimer la cible"):
             return
         try:
             kpi.supprimer_objectif(self.ctx, objectif["id"])
         except (ErreurApplication, OperationImpossible) as exc:
-            afficher_erreur(self, exc.message)
+            afficher_erreur(self.vue, exc.message)
             return
-        self._charger()
-        informer(self, "Cible supprimée.")
+        self.actualiser()
+        informer(self.vue, "Cible supprimée.")
 
 
 class FenetreObjectif(DialogueBase):
     """Formulaire d'ajout ou de modification d'une cible (UC15)."""
 
-    def __init__(self, parent, ctx, site_id: int, objectif: dict | None = None) -> None:
+    def __init__(self, parent, ctx, objectif: dict | None = None) -> None:
         titre = "Modifier la cible" if objectif else "Ajouter une cible"
         super().__init__(parent, titre, redimensionnable=False)
         self.ctx = ctx
-        self.site_id = site_id
         self.objectif = objectif
         self._construire()
 
@@ -284,6 +303,10 @@ class FenetreObjectif(DialogueBase):
         except ErreurApplication as exc:
             afficher_erreur(self, exc.message)
             definitions = []
+        try:
+            sites = admin.lister_sites(self.ctx)
+        except ErreurApplication:
+            sites = []
 
         formulaire = ttk.Frame(self.corps)
         formulaire.pack(fill="x")
@@ -298,9 +321,15 @@ class FenetreObjectif(DialogueBase):
         )
         self.periodicite.grid(row=0, column=2, sticky="w")
 
-        self.generale = ChampCase(formulaire, "Cible générale (tous les sites)")
-        self.generale.grid(row=1, column=0, columnspan=3, sticky="w", pady=(10, 0))
-        self.generale.variable.trace_add("write", lambda *_a: self._sur_generale())
+        self.site = ChampListe(
+            formulaire,
+            "Site",
+            options=[OPTION_TOUS_SITES] + [(s["id"], s["nom"]) for s in sites],
+            largeur=24,
+        )
+        self.site.definir(None)
+        self.site.grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        self.site.sur_changement(self._charger_zones)
         self.zone = ChampListe(formulaire, "Zone")
         self.zone.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
         self._charger_zones()
@@ -334,8 +363,8 @@ class FenetreObjectif(DialogueBase):
             self.kpi.activer(False)
             self.periodicite.definir(self.objectif["periodicite"])
             self.periodicite.activer(False)
-            self.generale.definir(self.objectif["site_id"] is None)
-            self.generale.activer(False)
+            self.site.definir(self.objectif["site_id"])
+            self.site.activer(False)
             self._charger_zones()
             self.zone.definir(self.objectif["zone_id"])
             self.zone.activer(False)
@@ -352,21 +381,18 @@ class FenetreObjectif(DialogueBase):
         self.ajouter_bouton("Annuler", self.fermer)
         self.ajouter_bouton("Enregistrer", self._enregistrer, primaire=True, defaut=True)
 
-    def _sur_generale(self) -> None:
-        self._charger_zones()
-
     def _charger_zones(self) -> None:
-        if self.generale.valeur():
+        site_id = self.site.valeur()
+        if site_id is None:
             self.zone.definir_options([(None, "—")], conserver=False)
             self.zone.activer(False)
             return
         try:
-            zones = admin.lister_zones(self.ctx, self.site_id)
+            zones = admin.lister_zones(self.ctx, site_id)
         except ErreurApplication:
             zones = []
         self.zone.definir_options(
-            [(None, "Toutes les zones du site")] + [(z["id"], z["nom"]) for z in zones],
-            conserver=False,
+            [OPTION_TOUTES_ZONES_SITE] + [(z["id"], z["nom"]) for z in zones], conserver=False
         )
         self.zone.activer(True)
 
@@ -377,7 +403,7 @@ class FenetreObjectif(DialogueBase):
         if kpi_id is None:
             afficher_erreur(self, "Choisissez un KPI.")
             return
-        site_id = None if self.generale.valeur() else self.site_id
+        site_id = self.site.valeur()
         zone_id = None if site_id is None else self.zone.valeur()
         configuration = {
             "valeur_cible": self.widgets["valeur_cible"].valeur(),

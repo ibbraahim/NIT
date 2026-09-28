@@ -37,7 +37,7 @@ def vue_kpi(application):
     connecter(application, "resp")
     application.naviguer("kpi_cibles")
     application.racine.update()
-    vue = application.vues["kpi_cibles"]
+    vue = application.vues["kpi_cibles"].page_suivi
     vue.site.definir(site_id)
     vue._sur_changement_site()
     vue.zone.definir(zone_id)
@@ -84,23 +84,25 @@ def test_filtre_par_famille(vue_kpi, application):
 
 
 def test_gerer_les_cibles_ajouter_modifier_supprimer(vue_kpi, application):
-    from app.gui.vues.kpi_cibles import FenetreCibles, FenetreObjectif
+    from app.gui.vues.kpi_cibles import FenetreObjectif
     from app.services import kpi
 
-    vue, site_id, zone_id = vue_kpi
+    _vue_suivi, site_id, zone_id = vue_kpi
     ctx = application.contexte
-
-    fenetre = FenetreCibles(vue, ctx, site_id)
+    onglet = application.vues["kpi_cibles"].page_cibles
+    onglet.actualiser()
     application.racine.update()
     # Les cibles générales par défaut sont là, mais aucune n'est spécifique au site.
-    assert fenetre.tableau.lignes()
-    assert not [l for l in fenetre.tableau.lignes() if l["site_id"] == site_id]
+    assert onglet.tableau.lignes()
+    assert not [l for l in onglet.tableau.lignes() if l["site_id"] == site_id]
 
-    dialogue = FenetreObjectif(fenetre, ctx, site_id)
+    dialogue = FenetreObjectif(onglet, ctx)
     application.racine.update()
     taux_hs_id = next(v for v, libelle in dialogue.kpi._choix if "TAUX_HS" in libelle)
     dialogue.kpi.definir(taux_hs_id)
     dialogue.periodicite.definir("jour")
+    dialogue.site.definir(site_id)
+    dialogue._charger_zones()
     dialogue.zone.definir(zone_id)
     dialogue.widgets["valeur_cible"].definir(6)
     dialogue.widgets["seuil_orange"].definir(6)
@@ -110,29 +112,29 @@ def test_gerer_les_cibles_ajouter_modifier_supprimer(vue_kpi, application):
     assert dialogue.resultat is True
     dialogue.destroy()
 
-    fenetre._charger()
+    onglet.actualiser()
     application.racine.update()
-    ajoutee = next(l for l in fenetre.tableau.lignes() if l["site_id"] == site_id)
+    ajoutee = next(l for l in onglet.tableau.lignes() if l["site_id"] == site_id)
     assert ajoutee["kpi_code"] == "TAUX_HS"
     assert ajoutee["portee"].startswith("Plateforme Casablanca")
 
-    modification = FenetreObjectif(fenetre, ctx, site_id, objectif=ajoutee)
+    modification = FenetreObjectif(onglet, ctx, objectif=ajoutee)
     application.racine.update()
     assert modification.kpi.saisie.instate(["disabled"])  # le KPI n'est plus modifiable
+    assert modification.site.saisie.instate(["disabled"])  # le site n'est plus modifiable
     modification.widgets["seuil_orange"].definir(4)
     modification._enregistrer()
     application.racine.update()
     assert modification.resultat is True
     modification.destroy()
 
-    fenetre._charger()
+    onglet.actualiser()
     application.racine.update()
-    ajoutee = next(l for l in fenetre.tableau.lignes() if l["site_id"] == site_id)
+    ajoutee = next(l for l in onglet.tableau.lignes() if l["site_id"] == site_id)
     assert ajoutee["seuil_orange"] == pytest.approx(4.0)
 
-    fenetre.tableau.selectionner(ajoutee["id"])
+    onglet.tableau.selectionner(ajoutee["id"])
     application.racine.update()
-    fenetre._supprimer()
+    onglet._supprimer()
     application.racine.update()
     assert not [o for o in kpi.lister_objectifs(ctx, site_id) if o["site_id"] == site_id]
-    fenetre.destroy()
