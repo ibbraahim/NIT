@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from datetime import date, timedelta
 
 import pytest
@@ -46,21 +45,16 @@ def test_detecter_puis_prendre_en_charge_et_resoudre(application):
     site_id, _zone_id = _preparer_sous_effectif(application)
     application.se_deconnecter()
     connecter(application, "resp")
+
+    from app.services import alertes as service_alertes
+
+    # UC18 est désormais émise par la tâche planifiée, plus par un bouton de l'écran :
+    # on la déclenche ici directement, comme le ferait la tâche automatique.
+    service_alertes.emettre_alertes(application.contexte, site_id)
+
     application.naviguer("alertes")
     application.racine.update()
     vue = application.vues["alertes"]
-
-    vue.site.definir(site_id)
-    vue.actualiser_donnees()
-    application.racine.update()
-    assert not vue.tableau.lignes()
-
-    vue.detecter()
-    for _ in range(200):
-        application.racine.update()
-        if vue.tableau.lignes() or application.erreurs:
-            break
-        time.sleep(0.05)
 
     assert application.erreurs == []
     lignes = vue.tableau.lignes()
@@ -111,11 +105,9 @@ def test_afficher_parametres_selectionne_l_alerte(application):
     resultat = service_alertes.emettre_alertes(application.contexte, site_id)
     alerte_id = resultat[0]["alerte_id"]
 
-    # Un seul site existe dans la démo : il est sélectionné automatiquement, et
     # afficher_parametres() sélectionne l'alerte dès l'actualisation qui suit la navigation
-    # (double-clic depuis le tableau de bord, à venir au lot 7).
+    # (double-clic depuis le tableau de bord, lot 7).
     application.naviguer("alertes", alerte_id=alerte_id)
     application.racine.update()
     vue = application.vues["alertes"]
-    assert vue.site.valeur() == site_id
     assert vue.tableau.ligne_selectionnee()["id"] == alerte_id

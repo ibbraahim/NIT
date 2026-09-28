@@ -97,18 +97,32 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     assert not application.planificateur.est_actif
     assert "arrêté" in taches.etat_planificateur.cget("text")
 
-    taches.tache.definir("kpi_quotidiens")
+    # Le tableau de synthèse liste les neuf tâches automatiques, chacune sa fréquence, même
+    # avant toute exécution.
+    lignes = taches.tableau.lignes()
+    assert len(lignes) == 9
+    assert all(l["dernier_statut_libelle"] == "Jamais exécutée" for l in lignes)
+    assert all(l["frequence"] for l in lignes)
+
+    taches.tableau.selectionner("kpi_quotidiens")
+    application.racine.update()
+    taches._sur_selection()
+    assert taches.b_executer.est_actif
+
+    nb_infos_avant = len(application.infos)
     taches.executer()
     for _ in range(400):
         application.racine.update()
-        if taches.tableau.lignes() or application.erreurs:
+        if len(application.infos) > nb_infos_avant or application.erreurs:
             break
         time.sleep(0.05)
 
     assert application.erreurs == []
     lignes = taches.tableau.lignes()
-    assert len(lignes) == 1
-    assert lignes[0]["statut_libelle"] == "Succès"
+    assert len(lignes) == 9
+    kpi_ligne = next(l for l in lignes if l["id"] == "kpi_quotidiens")
+    assert kpi_ligne["dernier_statut_libelle"] == "Succès"
+    assert kpi_ligne["derniere_duree"] != "—"
 
     from app.gui.vues.administration import FenetreJournalTaches
 

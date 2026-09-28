@@ -1,9 +1,9 @@
 """UC18 · Émettre une alerte — UC19 · Traiter une alerte.
 
-UC18 est déclenchée manuellement par le responsable (bouton « Détecter les alertes » de
-l'écran Alertes) ou par la tâche planifiée (lot 8) ; elle compare le plan de charge **validé**
-et les KPI déjà calculés à leurs seuils, et émet ou met à jour les alertes correspondantes
-(déduplication par ``cle_deduplication``, comme la dérive de modèle de l'UC21).
+UC18 est déclenchée par les tâches planifiées (``kpi_quotidiens``, qui inclut UC16/UC17, et
+``alertes_capacite``) ; elle compare le plan de charge **validé** et les KPI déjà calculés à
+leurs seuils, et émet ou met à jour les alertes correspondantes (déduplication par
+``cle_deduplication``, comme la dérive de modèle de l'UC21).
 
 Assignation (non détaillée par le prompt) : à l'émission, une alerte n'est assignée à
 personne ; « Prendre en charge » (UC19) l'assigne à son auteur (``assigne_a`` et
@@ -58,13 +58,22 @@ def lister_alertes_ouvertes(
 
 
 def lister_alertes(
-    ctx: Contexte, site_id: int, statut: str | None = None, type_alerte: str | None = None
+    ctx: Contexte,
+    site_id: int | None = None,
+    statut: str | None = None,
+    type_alerte: str | None = None,
+    niveau: str | None = None,
 ) -> list[dict]:
-    """Toutes les alertes d'un site, résolues comprises (écran Alertes)."""
+    """Alertes d'un site (rapports) ou, si ``site_id`` est ``None``, de tous les sites
+    visibles par l'utilisateur (écran Alertes), résolues comprises."""
     verifier_droit(ctx, "lecture_alertes")
-    verifier_site(ctx, site_id)
+    if site_id is not None:
+        verifier_site(ctx, site_id)
+        sites = [site_id]
+    else:
+        sites = None if ctx.voit_tous_les_sites else sorted(ctx.sites)
     with transaction() as cur:
-        return DepotAlertes(cur).lister(site_id, statut, type_alerte)
+        return DepotAlertes(cur).lister(sites, statut, type_alerte, niveau)
 
 
 # =====================================================================

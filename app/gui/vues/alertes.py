@@ -11,23 +11,25 @@ from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe, ChampTexteLong
 from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, informer
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
-from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import NIVEAUX_ALERTE, STATUTS_ALERTE, TYPES_ALERTE, libelle
-from app.services import admin, alertes
+from app.services import alertes
 from app.services.droits import a_le_droit
 from app.utils.format_fr import formater_date_heure
 
 OPTION_TOUS_STATUTS = (None, "Tous les statuts")
 OPTIONS_STATUT = [OPTION_TOUS_STATUTS] + list(STATUTS_ALERTE.items())
+OPTION_TOUS_NIVEAUX = (None, "Tous les niveaux")
+OPTIONS_NIVEAU = [OPTION_TOUS_NIVEAUX] + list(NIVEAUX_ALERTE.items())
 OPTION_TOUS_TYPES = (None, "Tous les types")
 OPTIONS_TYPE = [OPTION_TOUS_TYPES] + list(TYPES_ALERTE.items())
 
 COLONNES_TABLEAU = [
     Colonne("type_libelle", "Type", 170),
     Colonne("niveau_libelle", "Niveau", 80, "center"),
+    Colonne("site", "Site", 130),
     Colonne("zone", "Zone", 110),
     Colonne("date_concernee", "Date concernée", 110, "center"),
-    Colonne("message", "Message", 380),
+    Colonne("message", "Message", 340),
     Colonne("statut_libelle", "Statut", 90, "center"),
     Colonne("date_maj", "Dernière mise à jour", 150, "center", formateur=formater_date_heure),
 ]
@@ -38,35 +40,34 @@ def _etiquette(ligne: dict) -> str | None:
 
 
 class VueAlertes(Vue):
-    """Filtres Site/Statut/Type, détection (UC18), table des alertes, prise en charge et
-    résolution (UC19)."""
+    """Filtres Statut/Niveau/Type, table des alertes, prise en charge et clôture (UC19).
+
+    UC18 (émission des alertes) n'est plus déclenchée manuellement depuis cet écran : elle
+    est exécutée par les tâches automatiques planifiées (``kpi_quotidiens``,
+    ``alertes_capacite``)."""
 
     titre = "Alertes"
     sous_titre = "Sous-effectif, sureffectif, pénurie d'équipements, seuils de KPI, dérive"
 
     def construire(self) -> None:
-        self.peut_emettre = a_le_droit(self.ctx, "UC18")
         self.peut_traiter = a_le_droit(self.ctx, "UC19")
         self._alerte_a_selectionner: int | None = None
 
         barre = ttk.Frame(self.contenu)
         barre.pack(fill="x", pady=(0, 10))
-        self.site = ChampListe(barre, "Site", largeur=24)
-        self.site.pack(side="left")
-        self.site.sur_changement(self.actualiser_donnees)
         self.statut = ChampListe(barre, "Statut", options=OPTIONS_STATUT, largeur=16)
-        self.statut.pack(side="left", padx=(16, 0))
+        self.statut.pack(side="left")
         self.statut.sur_changement(self.actualiser_donnees)
+        self.niveau = ChampListe(barre, "Niveau", options=OPTIONS_NIVEAU, largeur=16)
+        self.niveau.pack(side="left", padx=(16, 0))
+        self.niveau.sur_changement(self.actualiser_donnees)
         self.type_alerte = ChampListe(barre, "Type", options=OPTIONS_TYPE, largeur=22)
         self.type_alerte.pack(side="left", padx=(16, 0))
         self.type_alerte.sur_changement(self.actualiser_donnees)
 
         boutons = ttk.Frame(barre)
         boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
-        self.b_detecter = Bouton(boutons, "Détecter les alertes", self.detecter, primaire=True)
-        self.b_detecter.pack(side="left")
-        if not self.peut_emettre:
-            self.b_detecter.pack_forget()
+        Bouton(boutons, "Actualiser", self.actualiser_donnees).pack(side="left")
 
         corps = ttk.Frame(self.contenu)
         corps.pack(fill="both", expand=True)
@@ -78,7 +79,7 @@ class VueAlertes(Vue):
         actions.pack(fill="x", pady=(10, 0))
         self.b_prendre_en_charge = Bouton(actions, "Prendre en charge", self.prendre_en_charge)
         self.b_prendre_en_charge.pack(side="left")
-        self.b_resoudre = Bouton(actions, "Résoudre…", self.resoudre)
+        self.b_resoudre = Bouton(actions, "Clôturer l'alerte…", self.resoudre)
         self.b_resoudre.pack(side="left", padx=(8, 0))
         if not self.peut_traiter:
             self.b_prendre_en_charge.pack_forget()
@@ -86,26 +87,22 @@ class VueAlertes(Vue):
         self._desactiver_actions()
 
     def actualiser(self) -> None:
-        sites = self.executer(lambda: admin.lister_sites(self.ctx)) or []
-        self.site.definir_options([(s["id"], s["nom"]) for s in sites])
         self.actualiser_donnees()
 
     def afficher_parametres(self, alerte_id: int | None = None, **_autres) -> None:
-        """Reçoit l'alerte à sélectionner (double-clic depuis le tableau de bord, à venir)."""
+        """Reçoit l'alerte à sélectionner (double-clic depuis le tableau de bord)."""
         self._alerte_a_selectionner = alerte_id
 
     def actualiser_donnees(self) -> None:
-        site_id = self.site.valeur()
-        statut, type_alerte = self.statut.valeur(), self.type_alerte.valeur()
-        self.b_detecter.activer(
-            self.peut_emettre and site_id is not None, "Choisissez d'abord un site."
+        statut, niveau, type_alerte = (
+            self.statut.valeur(),
+            self.niveau.valeur(),
+            self.type_alerte.valeur(),
         )
-        if site_id is None:
-            self.tableau.charger([], message_vide="Choisissez un site.")
-            self._desactiver_actions()
-            return
         lignes = (
-            self.executer(lambda: alertes.lister_alertes(self.ctx, site_id, statut, type_alerte))
+            self.executer(
+                lambda: alertes.lister_alertes(self.ctx, None, statut, type_alerte, niveau=niveau)
+            )
             or []
         )
         for ligne in lignes:
@@ -135,28 +132,6 @@ class VueAlertes(Vue):
         self.b_prendre_en_charge.activer(False, "Sélectionnez une alerte ouverte.")
         self.b_resoudre.activer(False, "Sélectionnez une alerte non résolue.")
 
-    def detecter(self) -> None:
-        site_id = self.site.valeur()
-        if site_id is None:
-            return
-
-        def traiter(_progression):
-            return alertes.emettre_alertes(self.ctx, site_id)
-
-        def succes(resultat):
-            self.actualiser_donnees()
-            informer(
-                self, f"{len(resultat)} alerte(s) émise(s) ou confirmée(s).", "Détection terminée"
-            )
-
-        executer_en_fond(
-            self,
-            traiter,
-            succes,
-            titre="Détection des alertes",
-            message="Analyse du plan de charge validé et des KPI…",
-        )
-
     def prendre_en_charge(self) -> None:
         ligne = self.tableau.ligne_selectionnee()
         if ligne is None:
@@ -182,7 +157,7 @@ class FenetreResolution(DialogueBase):
     """UC19 : commentaire obligatoire de clôture d'une alerte (docs/plan.md, Q7)."""
 
     def __init__(self, parent, ctx, alerte_id: int) -> None:
-        super().__init__(parent, "Résoudre l'alerte", redimensionnable=False)
+        super().__init__(parent, "Clôturer l'alerte", redimensionnable=False)
         self.ctx = ctx
         self.alerte_id = alerte_id
         self.action = ChampTexteLong(self.corps, "Action menée", hauteur=5, largeur=60)

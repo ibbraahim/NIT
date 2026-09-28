@@ -56,6 +56,19 @@ JOURS_CRON = {
     "dimanche": "sun",
 }
 
+#: Fréquence des tâches à horaire fixe (tableau de l'écran Administration, onglet Tâches).
+#: ``hebdomadaire`` n'y figure pas : son jour et son heure sont configurables (UC07).
+FREQUENCES_FIXES = {
+    "import_historique": "Chaque jour à 01:00",
+    "comparaison_quotidienne": "Chaque jour à 01:30",
+    "kpi_quotidiens": "Chaque jour à 01:45",
+    "alertes_capacite": "Chaque jour à 01:50",
+    "previsions_quotidiennes": "Chaque jour à 02:00",
+    "rapport_quotidien": "Chaque jour à 06:00",
+    "mensuel": "Le 1er de chaque mois à 04:00",
+    "annuel": "Le 1er janvier à 05:00",
+}
+
 
 def _sites() -> list[dict]:
     with transaction() as cur:
@@ -354,8 +367,20 @@ class Planificateur:
             _log.info("Planificateur de tâches arrêté.")
 
     def prochaines_executions(self) -> list[tuple[str, str | None]]:
-        """(identifiant de tâche, date/heure ISO de la prochaine exécution ou ``None``)."""
-        return [
-            (job.id, job.next_run_time.isoformat() if job.next_run_time else None)
-            for job in self._scheduler.get_jobs()
-        ]
+        """(identifiant de tâche, date/heure ISO de la prochaine exécution ou ``None``).
+
+        Tant que le planificateur n'a jamais été démarré, APScheduler n'a pas encore calculé
+        ``next_run_time`` (l'attribut n'existe alors pas sur le job)."""
+        resultat = []
+        for job in self._scheduler.get_jobs():
+            prochaine = getattr(job, "next_run_time", None)
+            resultat.append((job.id, prochaine.isoformat() if prochaine else None))
+        return resultat
+
+    def frequences(self) -> dict[str, str]:
+        """Libellé français de la fréquence de chaque tâche (tableau de l'écran
+        Administration, onglet Tâches)."""
+        config = _configuration_modeles()
+        jour = config["jour_reentrainement"].capitalize()
+        heure = config["heure_reentrainement"]
+        return {**FREQUENCES_FIXES, "hebdomadaire": f"Chaque {jour} à {heure}"}

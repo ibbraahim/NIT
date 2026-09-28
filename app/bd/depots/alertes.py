@@ -7,9 +7,9 @@ from datetime import date
 from app.bd.depots.base import Depot
 
 COLONNES = """a.id, a.type::text AS type, a.niveau::text AS niveau, a.kpi_id, a.site_id,
-             a.zone_id, z.nom AS zone, a.date_concernee, a.message, a.statut::text AS statut,
-             a.nb_occurrences, a.date_creation, a.date_maj"""
-_DE = "FROM alertes a LEFT JOIN zones z ON z.id = a.zone_id"
+             s.nom AS site, a.zone_id, z.nom AS zone, a.date_concernee, a.message,
+             a.statut::text AS statut, a.nb_occurrences, a.date_creation, a.date_maj"""
+_DE = "FROM alertes a JOIN sites s ON s.id = a.site_id LEFT JOIN zones z ON z.id = a.zone_id"
 
 
 class DepotAlertes(Depot):
@@ -70,17 +70,24 @@ class DepotAlertes(Depot):
         )
 
     def lister(
-        self, site_id: int, statut: str | None = None, type_alerte: str | None = None
+        self,
+        sites: list[int] | None,
+        statut: str | None = None,
+        type_alerte: str | None = None,
+        niveau: str | None = None,
     ) -> list[dict]:
-        """Toutes les alertes d'un site (écran Alertes, UC19), y compris résolues."""
+        """Alertes des sites donnés (``None`` : tous les sites), y compris résolues (écran
+        Alertes, UC19)."""
         return self._tous(
             f"""SELECT {COLONNES}, a.assigne_a, a.pris_en_charge_par, a.resolu_par,
                        a.action_menee, a.date_prise_en_charge, a.date_resolution
                 {_DE}
-                WHERE a.site_id = %s AND (%s::text IS NULL OR a.statut = %s)
+                WHERE (%s::int[] IS NULL OR a.site_id = ANY(%s::int[]))
+                  AND (%s::text IS NULL OR a.statut = %s)
                   AND (%s::text IS NULL OR a.type = %s)
+                  AND (%s::text IS NULL OR a.niveau = %s)
                 ORDER BY (a.statut <> 'resolue') DESC, (a.niveau = 'rouge') DESC, a.date_maj DESC""",
-            (site_id, statut, statut, type_alerte, type_alerte),
+            (sites, sites, statut, statut, type_alerte, type_alerte, niveau, niveau),
         )
 
     def alerte(self, alerte_id: int) -> dict | None:

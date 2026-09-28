@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
+import sys
 from datetime import date
+from pathlib import Path
 from tkinter import ttk
 
+from app.config import DOSSIER_RAPPORTS
 from app.erreurs import ErreurApplication
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
@@ -19,7 +24,17 @@ from app.services.droits import a_le_droit
 from app.utils.format_fr import formater_date, formater_date_heure
 
 OPTIONS_PERIODICITE = list(PERIODICITES.items())
-OPTIONS_FORMAT = [("pdf_excel", "PDF et Excel"), ("pdf", "PDF seul"), ("excel", "Excel seul")]
+
+
+def _ouvrir_chemin(chemin: Path) -> None:
+    """Ouvre un fichier ou un dossier avec l'application associée du système d'exploitation."""
+    if sys.platform.startswith("win"):
+        os.startfile(str(chemin))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(chemin)], check=True)
+    else:
+        subprocess.run(["xdg-open", str(chemin)], check=True)
+
 
 COLONNES_TABLEAU = [
     Colonne("periodicite_libelle", "Périodicité", 110),
@@ -31,7 +46,7 @@ COLONNES_TABLEAU = [
 
 
 class VueRapports(Vue):
-    """Filtres Site/Périodicité/Date/Format, génération (UC23), table des rapports déjà
+    """Filtres Type de période/Date/Site, génération (UC23), table des rapports déjà
     générés, export (UC24)."""
 
     titre = "Rapports"
@@ -43,21 +58,21 @@ class VueRapports(Vue):
 
         barre = ttk.Frame(self.contenu)
         barre.pack(fill="x", pady=(0, 10))
-        self.site = ChampListe(barre, "Site", largeur=22)
-        self.site.pack(side="left")
-        self.site.sur_changement(self.actualiser_donnees)
-        self.periodicite = ChampListe(barre, "Périodicité", options=OPTIONS_PERIODICITE, largeur=14)
+        self.periodicite = ChampListe(
+            barre, "Type de période", options=OPTIONS_PERIODICITE, largeur=16
+        )
         self.periodicite.definir("semaine")
-        self.periodicite.pack(side="left", padx=(16, 0))
+        self.periodicite.pack(side="left")
         self.date_reference = ChampDate(barre, "Date de référence")
         self.date_reference.definir(date.today())
         self.date_reference.pack(side="left", padx=(16, 0))
-        self.format = ChampListe(barre, "Format", options=OPTIONS_FORMAT, largeur=16)
-        self.format.pack(side="left", padx=(16, 0))
+        self.site = ChampListe(barre, "Site", largeur=22)
+        self.site.pack(side="left", padx=(16, 0))
+        self.site.sur_changement(self.actualiser_donnees)
 
         boutons = ttk.Frame(barre)
         boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
-        self.b_generer = Bouton(boutons, "Générer un rapport", self.generer, primaire=True)
+        self.b_generer = Bouton(boutons, "Générer le rapport", self.generer, primaire=True)
         self.b_generer.pack(side="left")
         if not self.peut_generer:
             self.b_generer.pack_forget()
@@ -70,13 +85,23 @@ class VueRapports(Vue):
 
         actions = ttk.Frame(self.contenu)
         actions.pack(fill="x", pady=(10, 0))
-        self.b_exporter_pdf = Bouton(actions, "Exporter en PDF…", self.exporter_pdf)
+        self.b_exporter_pdf = Bouton(actions, "Exporter en PDF", self.exporter_pdf)
         self.b_exporter_pdf.pack(side="left")
-        self.b_exporter_excel = Bouton(actions, "Exporter en Excel…", self.exporter_excel)
+        self.b_exporter_excel = Bouton(actions, "Exporter en Excel", self.exporter_excel)
         self.b_exporter_excel.pack(side="left", padx=(8, 0))
+        self.b_ouvrir_rapport = Bouton(
+            actions, "Ouvrir le rapport sélectionné", self.ouvrir_rapport
+        )
+        self.b_ouvrir_rapport.pack(side="left", padx=(8, 0))
+        self.b_ouvrir_dossier = Bouton(
+            actions, "Ouvrir le dossier des rapports", self.ouvrir_dossier
+        )
+        self.b_ouvrir_dossier.pack(side="left", padx=(8, 0))
         if not self.peut_exporter:
             self.b_exporter_pdf.pack_forget()
             self.b_exporter_excel.pack_forget()
+            self.b_ouvrir_rapport.pack_forget()
+            self.b_ouvrir_dossier.pack_forget()
         self._desactiver_export()
 
     def actualiser(self) -> None:
@@ -123,15 +148,21 @@ class VueRapports(Vue):
             self.peut_exporter and ligne is not None and bool(ligne["chemin_excel"]),
             "Sélectionnez un rapport avec un fichier Excel.",
         )
+        self.b_ouvrir_rapport.activer(
+            self.peut_exporter
+            and ligne is not None
+            and bool(ligne["chemin_pdf"] or ligne["chemin_excel"]),
+            "Sélectionnez un rapport.",
+        )
 
     def _desactiver_export(self) -> None:
         self.b_exporter_pdf.activer(False, "Sélectionnez un rapport avec un fichier PDF.")
         self.b_exporter_excel.activer(False, "Sélectionnez un rapport avec un fichier Excel.")
+        self.b_ouvrir_rapport.activer(False, "Sélectionnez un rapport.")
 
     def generer(self) -> None:
         site_id = self.site.valeur()
         periodicite = self.periodicite.valeur()
-        format_rapport = self.format.valeur()
         if site_id is None:
             return
         try:
@@ -141,9 +172,7 @@ class VueRapports(Vue):
             return
 
         def traiter(_progression):
-            return rapports.generer_rapport(
-                self.ctx, site_id, periodicite, date_reference, format_rapport
-            )
+            return rapports.generer_rapport(self.ctx, site_id, periodicite, date_reference)
 
         def succes(_resultat):
             self.actualiser_donnees()
@@ -177,3 +206,21 @@ class VueRapports(Vue):
 
     def exporter_excel(self) -> None:
         self._exporter("excel", "Exporter en Excel", [("Classeur Excel", "*.xlsx")])
+
+    def ouvrir_rapport(self) -> None:
+        ligne = self.tableau.ligne_selectionnee()
+        if ligne is None:
+            return
+        chemin_relatif = ligne["chemin_pdf"] or ligne["chemin_excel"]
+        if not chemin_relatif:
+            return
+        try:
+            _ouvrir_chemin(DOSSIER_RAPPORTS / chemin_relatif)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            afficher_erreur(self, f"Impossible d'ouvrir le rapport : {exc}")
+
+    def ouvrir_dossier(self) -> None:
+        try:
+            _ouvrir_chemin(DOSSIER_RAPPORTS)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            afficher_erreur(self, f"Impossible d'ouvrir le dossier des rapports : {exc}")

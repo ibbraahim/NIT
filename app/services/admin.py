@@ -576,6 +576,18 @@ def lister_journal_taches(ctx: Contexte, limite: int = 100) -> list[dict]:
         return DepotTaches(cur).journal(limite)
 
 
+def dernieres_executions_taches(ctx: Contexte) -> dict[str, dict | None]:
+    """Dernière exécution connue de chaque tâche automatique (nom → ligne du journal, ou
+    ``None`` si jamais exécutée), pour le tableau de synthèse de l'écran Administration."""
+    verifier_droit(ctx, "taches")
+    from app.bd.depots.taches import DepotTaches
+    from app.taches.planificateur import TACHES
+
+    with transaction() as cur:
+        depot = DepotTaches(cur)
+        return {nom: depot.derniere_execution(nom) for nom in TACHES}
+
+
 def executer_tache_manuelle(ctx: Contexte, nom_tache: str) -> str:
     """Exécute immédiatement une tâche automatique, à la demande de l'administrateur
     (bouton « Exécuter la tâche sélectionnée »)."""

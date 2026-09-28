@@ -27,7 +27,6 @@ def test_generer_puis_exporter(application, tmp_path, monkeypatch):
     vue.site.definir(site_id)
     vue.periodicite.definir("semaine")
     vue.date_reference.definir(date.today())
-    vue.format.definir("pdf_excel")
     vue.actualiser_donnees()
     application.racine.update()
     assert not vue.tableau.lignes()
@@ -68,3 +67,17 @@ def test_generer_puis_exporter(application, tmp_path, monkeypatch):
     application.racine.update()
     assert application.erreurs == []
     assert destination_excel.is_file()
+
+    assert vue.b_ouvrir_rapport.est_actif
+    chemins_ouverts = []
+    monkeypatch.setattr(vr, "_ouvrir_chemin", chemins_ouverts.append)
+    vue.ouvrir_rapport()
+    application.racine.update()
+    assert application.erreurs == []
+    assert len(chemins_ouverts) == 1
+
+    vue.ouvrir_dossier()
+    application.racine.update()
+    assert application.erreurs == []
+    assert len(chemins_ouverts) == 2
+    assert chemins_ouverts[1].name == "rapports"

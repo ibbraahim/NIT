@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from tkinter import ttk
 
 from app.config import configuration
@@ -964,18 +964,28 @@ class FenetreReinitialisationMotDePasse(DialogueBase):
 # =====================================================================
 # Onglet « Tâches »
 # =====================================================================
+def _formater_duree(duree: timedelta | None) -> str:
+    if duree is None:
+        return "—"
+    secondes = duree.total_seconds()
+    if secondes < 60:
+        return f"{secondes:.1f} s"
+    minutes, reste = divmod(int(secondes), 60)
+    return f"{minutes} min {reste:02d} s"
+
+
 class OngletTaches(Onglet):
-    """Boutons : « Exécuter la tâche sélectionnée », « Démarrer le planificateur » /
+    """Tableau de synthèse (Tâche, Fréquence, Prochaine exécution, Dernier statut, Dernière
+    durée) ; boutons « Exécuter la tâche sélectionnée », « Démarrer le planificateur » /
     « Suspendre le planificateur », « Voir le journal »."""
 
     def construire(self) -> None:
         barre = self.barre_boutons()
-        self.tache = ChampListe(barre, "Tâche", options=list(LIBELLES_TACHES.items()), largeur=40)
-        self.tache.pack(side="left")
         self.b_executer = Bouton(
             barre, "Exécuter la tâche sélectionnée", self.executer, primaire=True
         )
-        self.b_executer.pack(side="left", padx=(16, 0), pady=(14, 0))
+        self.b_executer.pack(side="left")
+        self.b_executer.activer(False, "Sélectionnez d'abord une tâche.")
 
         barre2 = ttk.Frame(self)
         barre2.pack(fill="x", pady=(0, 8))
@@ -990,19 +1000,30 @@ class OngletTaches(Onglet):
         self.tableau = TableauTriable(
             self,
             [
-                Colonne("tache_libelle", "Tâche", 260),
-                Colonne("debut", "Début", 150, "center", formateur=formater_date_heure),
-                Colonne("fin", "Fin", 150, "center", formateur=formater_date_heure),
-                Colonne("statut_libelle", "Statut", 90, "center"),
-                Colonne("message", "Message", 380),
+                Colonne("tache_libelle", "Tâche", 320),
+                Colonne("frequence", "Fréquence", 190),
+                Colonne(
+                    "prochaine_execution",
+                    "Prochaine exécution",
+                    150,
+                    "center",
+                    formateur=formater_date_heure,
+                ),
+                Colonne("dernier_statut_libelle", "Dernier statut", 110, "center"),
+                Colonne("derniere_duree", "Dernière durée", 100, "e"),
             ],
             hauteur=12,
         )
         self.tableau.pack(fill="both", expand=True)
+        self.tableau.sur_selection(self._sur_selection)
 
     def actualiser(self) -> None:
         self._rafraichir_etat()
-        self._charger_journal()
+        self._charger_tableau()
+
+    def _sur_selection(self) -> None:
+        actif = self.tableau.ligne_selectionnee() is not None
+        self.b_executer.activer(actif, "Sélectionnez d'abord une tâche.")
 
     def _rafraichir_etat(self) -> None:
         planificateur = self.vue.application.planificateur
@@ -1013,29 +1034,55 @@ class OngletTaches(Onglet):
         self.b_demarrer.activer(not actif, "Le planificateur est déjà en marche.")
         self.b_suspendre.activer(actif, "Le planificateur n'est pas en marche.")
 
-    def _charger_journal(self) -> None:
-        journal = self.vue.executer(lambda: admin.lister_journal_taches(self.ctx)) or []
-        for ligne in journal:
-            ligne["tache_libelle"] = LIBELLES_TACHES.get(ligne["tache"], ligne["tache"])
-            ligne["statut_libelle"] = STATUTS_TACHE.get(ligne["statut"], ligne["statut"])
+    def _charger_tableau(self) -> None:
+        from app.taches.planificateur import TACHES
+
+        planificateur = self.vue.application.planificateur
+        prochaines = dict(planificateur.prochaines_executions()) if planificateur else {}
+        frequences = planificateur.frequences() if planificateur else {}
+        dernieres = self.vue.executer(lambda: admin.dernieres_executions_taches(self.ctx)) or {}
         etiquettes = {"succes": "vert", "echec": "rouge", "en_cours": "orange"}
+        lignes = []
+        for nom in TACHES:
+            derniere = dernieres.get(nom)
+            duree = None
+            if derniere and derniere["fin"] is not None:
+                duree = derniere["fin"] - derniere["debut"]
+            prochaine = prochaines.get(nom)
+            lignes.append(
+                {
+                    "id": nom,
+                    "tache_libelle": LIBELLES_TACHES.get(nom, nom),
+                    "frequence": frequences.get(nom, "—"),
+                    "prochaine_execution": datetime.fromisoformat(prochaine) if prochaine else None,
+                    "statut": derniere["statut"] if derniere else None,
+                    "dernier_statut_libelle": (
+                        STATUTS_TACHE.get(derniere["statut"], derniere["statut"])
+                        if derniere
+                        else "Jamais exécutée"
+                    ),
+                    "derniere_duree": _formater_duree(duree),
+                }
+            )
         self.tableau.charger(
-            journal,
+            lignes,
             cle_id="id",
             etiquettes=lambda lg: etiquettes.get(lg["statut"]),
-            message_vide="Aucune tâche exécutée pour l'instant.",
+            message_vide="Aucune tâche.",
         )
+        self._sur_selection()
 
     def executer(self) -> None:
-        nom_tache = self.tache.valeur()
-        if nom_tache is None:
+        ligne = self.tableau.ligne_selectionnee()
+        if ligne is None:
             return
+        nom_tache = ligne["id"]
 
         def traiter(_progression):
             return admin.executer_tache_manuelle(self.ctx, nom_tache)
 
         def succes(message):
-            self._charger_journal()
+            self._charger_tableau()
             informer(self, message, "Tâche terminée")
 
         executer_en_fond(
@@ -1049,12 +1096,14 @@ class OngletTaches(Onglet):
     def demarrer(self) -> None:
         self.vue.application.planificateur.demarrer()
         self._rafraichir_etat()
+        self._charger_tableau()
         self.vue.application.actualiser_barre_etat()
         informer(self, "Planificateur de tâches démarré.")
 
     def suspendre(self) -> None:
         self.vue.application.planificateur.suspendre()
         self._rafraichir_etat()
+        self._charger_tableau()
         self.vue.application.actualiser_barre_etat()
         informer(self, "Planificateur de tâches suspendu.")
 
