@@ -82,17 +82,20 @@ points discutables »).
 
 ## Tâches automatiques
 
-Six tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches
+Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches
 (`app/taches/planificateur.py`) :
 
 | Tâche | Cas d'utilisation | Fréquence par défaut |
 |---|---|---|
-| `entrainer_modeles` | UC08 (ne change jamais le modèle actif) | hebdomadaire (jour/heure configurables) |
-| `comparer_realise` | UC20 | quotidienne, 02:00 |
-| `calculer_kpi` | UC16, UC17 | quotidienne, 02:15 |
-| `detecter_derive` | UC21 | quotidienne, 02:20 |
-| `emettre_alertes` | UC18 | quotidienne, 02:30 |
-| `generer_rapport` | UC23 | hebdomadaire, lundi 03:00 |
+| `import_historique` | UC04 (import), UC06 | quotidienne, 01:00 |
+| `comparaison_quotidienne` | UC20, UC21 | quotidienne, 01:30 |
+| `kpi_quotidiens` | UC16, UC17 (jour) | quotidienne, 01:45 |
+| `alertes_capacite` | UC18 | quotidienne, 01:50 |
+| `previsions_quotidiennes` | UC11 (J+1 à J+14) | quotidienne, 02:00 |
+| `rapport_quotidien` | UC23 (jour) | quotidienne, 06:00 |
+| `hebdomadaire` | UC08 (ne change jamais le modèle actif), UC17 (semaine), UC23 (semaine) | hebdomadaire (jour/heure configurables, par défaut lundi 03:00) |
+| `mensuel` | UC17 (mois), UC23 (mois) | 1er du mois, 04:00 |
+| `annuel` | UC17 (année), UC23 (année) | 1er janvier, 05:00 |
 
 Démarrage et suspension se font depuis l'écran Administration (bouton « Démarrer le
 planificateur » / « Suspendre le planificateur ») ; l'état s'affiche dans la barre du bas.

@@ -17,12 +17,12 @@ def test_executer_tache_inconnue_refuse(bd_vierge):
 
 
 def test_executer_tache_journalise_le_succes(bd_vierge):
-    message = executer_tache("calculer_kpi")
+    message = executer_tache("kpi_quotidiens")
     assert isinstance(message, str)
     with transaction() as cur:
         journal = DepotTaches(cur).journal()
     assert len(journal) == 1
-    assert journal[0]["tache"] == "calculer_kpi"
+    assert journal[0]["tache"] == "kpi_quotidiens"
     assert journal[0]["statut"] == "succes"
     assert journal[0]["message"] == message
     assert journal[0]["fin"] is not None
@@ -32,9 +32,9 @@ def test_executer_tache_journalise_l_echec(bd_vierge, monkeypatch):
     def _en_echec():
         raise RuntimeError("panne simulée")
 
-    monkeypatch.setitem(TACHES, "calculer_kpi", _en_echec)
+    monkeypatch.setitem(TACHES, "kpi_quotidiens", _en_echec)
     with pytest.raises(RuntimeError):
-        executer_tache("calculer_kpi")
+        executer_tache("kpi_quotidiens")
     with transaction() as cur:
         journal = DepotTaches(cur).journal()
     assert journal[0]["statut"] == "echec"

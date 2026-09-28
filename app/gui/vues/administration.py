@@ -41,12 +41,17 @@ from app.utils.format_fr import (
 
 OPTIONS_ROLES = [(r, LIBELLES_ROLES[r]) for r in ROLES_UTILISATEUR]
 LIBELLES_TACHES = {
-    "entrainer_modeles": "Réentraîner les modèles (UC08)",
-    "comparer_realise": "Comparer le réalisé aux prévisions (UC20)",
-    "calculer_kpi": "Calculer les KPI (UC16, UC17)",
-    "detecter_derive": "Détecter une dérive de modèle (UC21)",
-    "emettre_alertes": "Émettre les alertes (UC18)",
-    "generer_rapport": "Générer le rapport hebdomadaire (UC23)",
+    "import_historique": "Importer l'historique déposé (UC04, UC06)",
+    "comparaison_quotidienne": "Comparer le réalisé aux prévisions et détecter une dérive "
+    "(UC20, UC21)",
+    "kpi_quotidiens": "Calculer les KPI du jour (UC16, UC17)",
+    "alertes_capacite": "Émettre les alertes de capacité et de seuil (UC18)",
+    "previsions_quotidiennes": "Générer les prévisions J+1 à J+14 (UC11)",
+    "rapport_quotidien": "Générer le rapport quotidien (UC23)",
+    "hebdomadaire": "Réentraîner les modèles et générer le rapport hebdomadaire (UC08, "
+    "UC17, UC23)",
+    "mensuel": "Calculer les KPI et générer le rapport mensuel (UC17, UC23)",
+    "annuel": "Calculer les KPI et générer le rapport annuel (UC17, UC23)",
 }
 
 OPTIONS_TYPES = list(TYPES_EQUIPEMENT.items())

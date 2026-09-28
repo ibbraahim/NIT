@@ -97,7 +97,7 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     assert not application.planificateur.est_actif
     assert "arrêté" in taches.etat_planificateur.cget("text")
 
-    taches.tache.definir("calculer_kpi")
+    taches.tache.definir("kpi_quotidiens")
     taches.executer()
     for _ in range(400):
         application.racine.update()
