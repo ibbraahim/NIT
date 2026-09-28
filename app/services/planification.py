@@ -356,6 +356,15 @@ def lire_plan_charge(ctx: Contexte, site_id: int, semaine: date) -> dict | None:
     return {"plan": plan, "lignes": lignes}
 
 
+def lister_plan_valide_periode(ctx: Contexte, site_id: int, debut: date, fin: date) -> list[dict]:
+    """Lignes des plans de charge **validés** du site sur une période, toutes zones (rapport
+    de performance, UC23 : section « plan de charge validé et écarts »)."""
+    verifier_droit(ctx, "lecture_plan")
+    verifier_site(ctx, site_id)
+    with transaction() as cur:
+        return DepotPlansCharge(cur).lignes_validees_periode(site_id, None, debut, fin)
+
+
 def _en_depassement(ligne: dict) -> bool:
     """Une case où le besoin dépasse la capacité (colorée en rouge dans la grille)."""
     return (

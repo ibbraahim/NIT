@@ -10,6 +10,7 @@ que l'écran l'enregistre où l'utilisateur le souhaite (même geste que les aut
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 from pathlib import Path
 
 from app.bd.connexion import transaction
@@ -30,16 +31,44 @@ from app.libelles import (
     libelle,
 )
 from app.services.alertes import lister_alertes
+from app.services.comparaison import lister_comparaisons
 from app.services.droits import verifier_droit, verifier_site
-from app.services.kpi import comparer_kpi_cibles
+from app.services.kpi import (
+    calculer_biais,
+    calculer_couverture_ic,
+    calculer_mae,
+    calculer_mape,
+    calculer_rmse,
+    calculer_taux_victoire,
+    comparer_kpi_cibles,
+)
+from app.services.planification import lister_plan_valide_periode
 from app.utils.dates import bornes_periode
 from app.utils.fichiers_excel import ecrire_classeur
-from app.utils.fichiers_pdf import ecrire_rapport_pdf
+from app.utils.fichiers_pdf import (
+    COULEUR_REEL,
+    COULEUR_RL,
+    COULEUR_RN,
+    SectionRapport,
+    ecrire_rapport_pdf,
+    graphique_png,
+)
 from app.utils.format_fr import formater_date, formater_nombre
 
 _log = journal(__name__)
 
 FORMATS_VALIDES = ("pdf", "excel", "pdf_excel")
+
+#: (libellé, fonction de calcul, sens de la meilleure valeur) pour les 5 premières métriques de
+#: comparaison RL/RN ; le taux de victoire (comparatif par nature) est calculé à part. Même
+#: convention que l'écran Comparaison réel/prévu (UC20).
+_FORMULES_METRIQUES = (
+    ("MAE (heures)", calculer_mae, "bas"),
+    ("RMSE (heures)", calculer_rmse, "bas"),
+    ("MAPE (%)", calculer_mape, "bas"),
+    ("Biais (%)", calculer_biais, "zero"),
+    ("Couverture IC (%)", calculer_couverture_ic, "80"),
+)
 
 
 def _lignes_kpi(valeurs: list[dict]) -> tuple[list[str], list[list[str]]]:
@@ -75,6 +104,180 @@ def _lignes_alertes(alertes: list[dict]) -> tuple[list[str], list[list[str]]]:
     return en_tetes, lignes
 
 
+def _meilleure_methode(valeur_rl: float | None, valeur_rn: float | None, mode: str) -> str | None:
+    """« rl », « rn » ou ``None`` (égalité ou valeur manquante) : quelle méthode gagne."""
+    if valeur_rl is None or valeur_rn is None or valeur_rl == valeur_rn:
+        return None
+    if mode == "bas":
+        return "rl" if valeur_rl < valeur_rn else "rn"
+    if mode == "haut":
+        return "rl" if valeur_rl > valeur_rn else "rn"
+    if mode == "zero":
+        return "rl" if abs(valeur_rl) < abs(valeur_rn) else "rn"
+    if mode == "80":
+        return "rl" if abs(valeur_rl - 80) < abs(valeur_rn - 80) else "rn"
+    return None
+
+
+def _lignes_comparaison(
+    lignes_rl: list[dict], lignes_rn: list[dict]
+) -> tuple[list[str], list[list[str]]]:
+    """UC20 : métriques de précision RL et RN côte à côte, et la méthode qui l'emporte."""
+    en_tetes = ["Métrique", "RL", "RN", "Meilleure méthode"]
+    metriques = [
+        (libelle_m, fonction(lignes_rl), fonction(lignes_rn), mode)
+        for libelle_m, fonction, mode in _FORMULES_METRIQUES
+    ]
+    metriques.append(
+        (
+            "Taux de victoire (%)",
+            calculer_taux_victoire(lignes_rl, lignes_rn),
+            calculer_taux_victoire(lignes_rn, lignes_rl),
+            "haut",
+        )
+    )
+    libelles_methode = {"rl": "RL", "rn": "RN", None: "—"}
+    lignes = [
+        [
+            libelle_m,
+            formater_nombre(valeur_rl, 2) if valeur_rl is not None else "—",
+            formater_nombre(valeur_rn, 2) if valeur_rn is not None else "—",
+            libelles_methode[_meilleure_methode(valeur_rl, valeur_rn, mode)],
+        ]
+        for libelle_m, valeur_rl, valeur_rn, mode in metriques
+    ]
+    return en_tetes, lignes
+
+
+def _agregation_reel_rl_rn(
+    lignes_rl: list[dict], lignes_rn: list[dict]
+) -> tuple[list[date], dict[date, float], dict[date, float], dict[date, float]] | None:
+    """Heures réel / RL / RN agrégées par jour, tous zones confondues (même agrégation que
+    l'écran Comparaison réel/prévu, UC20). ``None`` si aucun rapprochement."""
+    if not lignes_rl and not lignes_rn:
+        return None
+    dates = sorted({r["date_jour"] for r in lignes_rl + lignes_rn})
+    reel: dict[date, float] = {}
+    rl_par_date: dict[date, float] = {}
+    rn_par_date: dict[date, float] = {}
+    zones_vues: dict[date, set[int]] = {}
+    for lignes, cible in ((lignes_rl, rl_par_date), (lignes_rn, rn_par_date)):
+        for r in lignes:
+            cible[r["date_jour"]] = cible.get(r["date_jour"], 0.0) + (r["heures_prevues"] or 0.0)
+            vues = zones_vues.setdefault(r["date_jour"], set())
+            if r["zone_id"] not in vues and r["heures_reelles"] is not None:
+                vues.add(r["zone_id"])
+                reel[r["date_jour"]] = reel.get(r["date_jour"], 0.0) + r["heures_reelles"]
+    return dates, reel, rl_par_date, rn_par_date
+
+
+def _graphique_reel_rl_rn(lignes_rl: list[dict], lignes_rn: list[dict]) -> BytesIO | None:
+    agregation = _agregation_reel_rl_rn(lignes_rl, lignes_rn)
+    if agregation is None:
+        return None
+    dates, reel, rl_par_date, rn_par_date = agregation
+
+    def serie(valeurs_par_date: dict[date, float]) -> list[float]:
+        return [valeurs_par_date.get(jour, float("nan")) for jour in dates]
+
+    return graphique_png(
+        dates,
+        [
+            ("Réalisé", serie(reel), COULEUR_REEL),
+            ("Prévu (RL)", serie(rl_par_date), COULEUR_RL),
+            ("Prévu (RN)", serie(rn_par_date), COULEUR_RN),
+        ],
+    )
+
+
+def _feuille_reel_rl_rn(lignes_rl: list[dict], lignes_rn: list[dict]) -> tuple[list[str], list]:
+    """Équivalent Excel du graphique réel/RL/RN : valeurs journalières brutes (une feuille par
+    section, UC24)."""
+    en_tetes = ["Date", "Réalisé (h)", "Prévu RL (h)", "Prévu RN (h)"]
+    agregation = _agregation_reel_rl_rn(lignes_rl, lignes_rn)
+    if agregation is None:
+        return en_tetes, []
+    dates, reel, rl_par_date, rn_par_date = agregation
+    lignes = [
+        [formater_date(jour), reel.get(jour), rl_par_date.get(jour), rn_par_date.get(jour)]
+        for jour in dates
+    ]
+    return en_tetes, lignes
+
+
+def _lignes_plan_charge(lignes_plan: list[dict]) -> tuple[list[str], list[list[str]]]:
+    en_tetes = [
+        "Zone",
+        "Date",
+        "Besoin effectif",
+        "Effectif planifié",
+        "Écart effectif",
+        "Besoin équipements",
+        "Équipements planifiés",
+        "Écart équipements",
+        "Commentaire",
+    ]
+    lignes = [
+        [
+            l["zone"],
+            formater_date(l["date_jour"]),
+            str(l["besoin_effectif"]),
+            str(l["effectif_planifie"] + l["interim_planifie"]),
+            str(l["effectif_planifie"] + l["interim_planifie"] - l["besoin_effectif"]),
+            str(l["besoin_equipements"]),
+            str(l["equipements_planifies"]),
+            str(l["equipements_planifies"] - l["besoin_equipements"]),
+            l["commentaire"] or "—",
+        ]
+        for l in lignes_plan
+    ]
+    return en_tetes, lignes
+
+
+def _synthese(
+    valeurs_kpi: list[dict],
+    alertes_periode: list[dict],
+    lignes_rl: list[dict],
+    lignes_rn: list[dict],
+    lignes_plan: list[dict],
+) -> list[str]:
+    """Synthèse en 5 lignes maximum, générée à partir des chiffres de la période (UC23)."""
+    lignes: list[str] = []
+    if valeurs_kpi:
+        nb_hors_cible = sum(1 for v in valeurs_kpi if v["statut"] in ("orange", "rouge"))
+        lignes.append(
+            f"{nb_hors_cible} indicateur(s) sur {len(valeurs_kpi)} hors cible "
+            "(statut orange ou rouge)."
+        )
+    if alertes_periode:
+        nb_ouvertes = sum(1 for a in alertes_periode if a["statut"] != "resolue")
+        lignes.append(
+            f"{len(alertes_periode)} alerte(s) sur la période, dont {nb_ouvertes} encore "
+            "non résolue(s)."
+        )
+    mae_rl, mae_rn = calculer_mae(lignes_rl), calculer_mae(lignes_rn)
+    if mae_rl is not None or mae_rn is not None:
+        parties = []
+        if mae_rl is not None:
+            parties.append(f"RL {formater_nombre(mae_rl, 1)} h")
+        if mae_rn is not None:
+            parties.append(f"RN {formater_nombre(mae_rn, 1)} h")
+        lignes.append("Écart moyen réel/prévu (MAE) : " + ", ".join(parties) + ".")
+    if lignes_plan:
+        nb_couvertes = sum(
+            1
+            for l in lignes_plan
+            if l["effectif_planifie"] + l["interim_planifie"] >= l["besoin_effectif"]
+        )
+        lignes.append(
+            f"Plan de charge validé : {nb_couvertes} case(s) sur {len(lignes_plan)} "
+            "couvrant le besoin en effectif."
+        )
+    if not lignes:
+        lignes.append("Aucune donnée disponible pour cette période.")
+    return lignes[:5]
+
+
 def generer_rapport(
     ctx: Contexte,
     site_id: int,
@@ -99,14 +302,20 @@ def generer_rapport(
     valeurs_kpi = comparer_kpi_cibles(ctx, site_id, None, periodicite, date_reference)
     toutes_alertes = lister_alertes(ctx, site_id)
     alertes_periode = [a for a in toutes_alertes if debut <= a["date_concernee"] <= fin]
+    lignes_rl = lister_comparaisons(ctx, site_id, None, debut, fin, "regression_lineaire")
+    lignes_rn = lister_comparaisons(ctx, site_id, None, debut, fin, "reseau_neurones")
+    lignes_plan = lister_plan_valide_periode(ctx, site_id, debut, fin)
 
     titre = f"Rapport de performance — {site['nom']}"
     sous_titre = (
         f"{libelle(PERIODICITES, periodicite)} du {formater_date(debut)} au "
         f"{formater_date(fin)} — généré par {ctx.identifiant} le {formater_date(date.today())}"
     )
+    synthese = _synthese(valeurs_kpi, alertes_periode, lignes_rl, lignes_rn, lignes_plan)
     entetes_kpi, lignes_kpi = _lignes_kpi(valeurs_kpi)
+    entetes_comparaison, lignes_comparaison = _lignes_comparaison(lignes_rl, lignes_rn)
     entetes_alertes, lignes_alertes = _lignes_alertes(alertes_periode)
+    entetes_plan, lignes_plan_tableau = _lignes_plan_charge(lignes_plan)
 
     nom_base = f"rapport_{site_id}_{periodicite}_{debut.isoformat()}"
     chemin_pdf = chemin_excel = None
@@ -117,8 +326,20 @@ def generer_rapport(
             titre,
             sous_titre,
             [
-                ("Indicateurs de performance (KPI)", entetes_kpi, lignes_kpi),
-                ("Alertes de la période", entetes_alertes, lignes_alertes),
+                SectionRapport("Synthèse", texte=synthese),
+                SectionRapport(
+                    "Indicateurs de performance (KPI)", tableau=(entetes_kpi, lignes_kpi)
+                ),
+                SectionRapport(
+                    "Réel / RL / RN des heures", image=_graphique_reel_rl_rn(lignes_rl, lignes_rn)
+                ),
+                SectionRapport(
+                    "Comparaison RL vs RN", tableau=(entetes_comparaison, lignes_comparaison)
+                ),
+                SectionRapport("Alertes de la période", tableau=(entetes_alertes, lignes_alertes)),
+                SectionRapport(
+                    "Plan de charge validé et écarts", tableau=(entetes_plan, lignes_plan_tableau)
+                ),
             ],
         )
     if format_rapport in ("excel", "pdf_excel"):
@@ -126,8 +347,12 @@ def generer_rapport(
         ecrire_classeur(
             DOSSIER_RAPPORTS / chemin_excel,
             {
+                "Synthèse": (["Ligne"], [[ligne] for ligne in synthese]),
                 "KPI": (entetes_kpi, lignes_kpi),
+                "Réel RL RN": _feuille_reel_rl_rn(lignes_rl, lignes_rn),
+                "Comparaison RL RN": (entetes_comparaison, lignes_comparaison),
                 "Alertes": (entetes_alertes, lignes_alertes),
+                "Plan de charge": (entetes_plan, lignes_plan_tableau),
             },
         )
 
@@ -138,6 +363,7 @@ def generer_rapport(
         "date_fin": fin.isoformat(),
         "kpi": valeurs_kpi,
         "alertes": alertes_periode,
+        "synthese": synthese,
     }
     with transaction() as cur:
         rapport_id = DepotRapports(cur).creer(

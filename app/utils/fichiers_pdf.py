@@ -7,8 +7,13 @@ PDF, elle couvre tous les caractères typographiques français (guillemets « »
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
+from datetime import date
+from io import BytesIO
 from pathlib import Path
 
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -18,6 +23,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     Image,
+    ListFlowable,
+    ListItem,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -31,6 +38,44 @@ from app.config import DOSSIER_IMAGES, DOSSIER_POLICES
 
 #: Couleur d'accent de marque Workly (milieu du dégradé — voir app.gui.style).
 COULEUR_ACCENT_MARQUE = colors.HexColor("#4C6CF0")
+
+#: Palette des graphiques du rapport (réel, RL, RN — mêmes couleurs que l'écran Comparaison,
+#: reprises ici en dur pour que ce module reste indépendant de Tkinter/app.gui).
+COULEUR_REEL = "#1f4e79"
+COULEUR_RL = "#e07b00"
+COULEUR_RN = "#2e7d32"
+
+
+@dataclass
+class SectionRapport:
+    """Une section du rapport : un titre, et l'un de ``texte`` (paragraphe ou puces), de
+    ``tableau`` (en-têtes, lignes) ou d'``image`` (PNG, voir :func:`graphique_png`)."""
+
+    titre: str
+    texte: list[str] | None = None
+    tableau: tuple[list[str], list[list[str]]] | None = None
+    image: BytesIO | None = None
+
+
+def graphique_png(dates: list[date], series: list[tuple[str, list[float], str]]) -> BytesIO:
+    """PNG d'un graphique en ligne à plusieurs séries (rendu Agg, sans dépendance à Tkinter
+    ni à un affichage : utilisable depuis les tâches automatiques comme depuis l'écran).
+
+    ``series`` : liste de ``(libellé, valeurs, couleur)``, les valeurs manquantes étant
+    ``float("nan")`` (laisse un trou dans la ligne plutôt que de la relier à tort)."""
+    figure = Figure(figsize=(7.2, 3.2), dpi=130)
+    axe = figure.add_subplot(111)
+    for libelle_serie, valeurs, couleur in series:
+        axe.plot(dates, valeurs, marker="o", markersize=3, color=couleur, label=libelle_serie)
+    axe.set_ylabel("Heures")
+    axe.legend(fontsize=8, loc="upper left")
+    axe.tick_params(axis="x", labelrotation=30, labelsize=7)
+    figure.tight_layout()
+    tampon = BytesIO()
+    FigureCanvasAgg(figure).print_png(tampon)
+    tampon.seek(0)
+    return tampon
+
 
 POLICE = "DejaVuSans"
 POLICE_GRAS = "DejaVuSans-Bold"
@@ -54,10 +99,11 @@ def ecrire_rapport_pdf(
     chemin: Path,
     titre: str,
     sous_titre: str,
-    sections: list[tuple[str, list[str], list[list[str]]]],
+    sections: list[SectionRapport],
 ) -> None:
-    """Écrit un PDF : titre, sous-titre, puis une suite de sections ``(titre, en_tetes,
-    lignes)`` rendues en tableau. Une section sans ligne affiche « Aucune donnée »."""
+    """Écrit un PDF : titre, sous-titre, puis une suite de :class:`SectionRapport` (texte,
+    tableau ou image). Un tableau sans ligne, ou une image absente, affiche « Aucune
+    donnée »."""
     with _verrou:
         _ecrire(chemin, titre, sous_titre, sections)
 
@@ -66,7 +112,7 @@ def _ecrire(
     chemin: Path,
     titre: str,
     sous_titre: str,
-    sections: list[tuple[str, list[str], list[list[str]]]],
+    sections: list[SectionRapport],
 ) -> None:
     _enregistrer_polices()
     chemin.parent.mkdir(parents=True, exist_ok=True)
@@ -87,8 +133,30 @@ def _ecrire(
         Paragraph(_echapper(titre), style_titre),
         Paragraph(_echapper(sous_titre), style_sous_titre),
     ]
-    for titre_section, en_tetes, lignes in sections:
-        elements.append(Paragraph(_echapper(titre_section), style_section))
+    style_puce = ParagraphStyle("Puce", fontName=POLICE, fontSize=10, leading=14)
+
+    for section in sections:
+        elements.append(Paragraph(_echapper(section.titre), style_section))
+        if section.texte is not None:
+            if not section.texte:
+                elements.append(Paragraph("Aucune donnée.", style_vide))
+                continue
+            elements.append(
+                ListFlowable(
+                    [ListItem(Paragraph(_echapper(ligne), style_puce)) for ligne in section.texte],
+                    bulletType="bullet",
+                    leftIndent=14,
+                )
+            )
+            elements.append(Spacer(1, 4))
+            continue
+        if section.image is not None:
+            image = Image(section.image, width=17 * cm, height=17 * cm * 3.2 / 7.2)
+            image.hAlign = "LEFT"
+            elements.append(image)
+            elements.append(Spacer(1, 4))
+            continue
+        en_tetes, lignes = section.tableau or ([], [])
         if not lignes:
             elements.append(Paragraph("Aucune donnée.", style_vide))
             continue
