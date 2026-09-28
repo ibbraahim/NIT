@@ -1,4 +1,4 @@
-"""Test de fumée de l'écran Tableau de bord (UC22)."""
+"""Test de fumée de l'écran Tableau de bord (UC22) : contenu propre à chaque rôle."""
 
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ from tests.conftest import connecter
 pytestmark = [pytest.mark.gui, pytest.mark.integration]
 
 
-def _preparer_kpi_rouge_et_alerte(application) -> tuple[int, int]:
+def _preparer_historique_charge(application) -> tuple[int, int]:
+    """Historique chargeant fortement les heures supplémentaires (KPI hors cible, UC17)."""
     ctx = application.contexte
     site_id = admin.lister_sites(ctx)[0]["id"]
     zone_id = admin.lister_zones(ctx, site_id)[0]["id"]
@@ -50,35 +51,16 @@ def _preparer_kpi_rouge_et_alerte(application) -> tuple[int, int]:
     return site_id, zone_id
 
 
-def test_tableau_de_bord_affiche_kpi_hors_cible(application):
+def test_tableau_de_bord_planificateur_tuiles_ecarts_et_alertes(application):
     from app.services import kpi
 
     connecter(application, "admin")
-    site_id, _zone_id = _preparer_kpi_rouge_et_alerte(application)
+    site_id, zone_id = _preparer_historique_charge(application)
     application.se_deconnecter()
     connecter(application, "resp")
-    # UC17 calcule et enregistre les statuts que le tableau de bord lira ensuite.
-    kpi.comparer_kpi_cibles(application.contexte, site_id, None, "semaine", date.today())
-
-    application.naviguer("tableau_bord")
-    application.racine.update()
-    vue = application.vues["tableau_bord"]
-    vue.site.definir(site_id)
-    vue.actualiser_donnees()
-    application.racine.update()
-
-    assert application.erreurs == []
-    lignes = vue.tableau_kpi.lignes()
-    taux_hs = next(l for l in lignes if l["kpi_code"] == "TAUX_HS")
-    assert taux_hs["statut"] == "rouge"
-
-
-def test_tableau_de_bord_double_clic_ouvre_l_alerte(application):
-    connecter(application, "admin")
-    site_id = admin.lister_sites(application.contexte)[0]["id"]
-    zone_id = admin.lister_zones(application.contexte, site_id)[0]["id"]
+    kpi.comparer_kpi_cibles(application.contexte, site_id, None, "jour", date.today())
     application.se_deconnecter()
-    connecter(application, "resp")
+    connecter(application, "planif")
 
     with transaction() as cur:
         from app.bd.depots.alertes import DepotAlertes
@@ -97,10 +79,15 @@ def test_tableau_de_bord_double_clic_ouvre_l_alerte(application):
     application.naviguer("tableau_bord")
     application.racine.update()
     vue = application.vues["tableau_bord"]
+    assert vue.periode.valeur() == "jour"  # vue jour par défaut pour le planificateur
     vue.site.definir(site_id)
     vue.actualiser_donnees()
     application.racine.update()
 
+    assert application.erreurs == []
+    codes = {v["kpi_code"] for v in vue.dernieres_valeurs_kpi}
+    assert {"ADEQUATION", "TAUX_DISPO_EQP", "JOURS_PENURIE"} <= codes
+    assert vue.tableau_ecarts is not None
     assert alertes.compter_alertes_ouvertes(application.contexte) >= 1
     assert vue.tableau_alertes.lignes()
 
@@ -109,3 +96,56 @@ def test_tableau_de_bord_double_clic_ouvre_l_alerte(application):
     assert application.vue_courante == "alertes"
     vue_alertes = application.vues["alertes"]
     assert vue_alertes.tableau.ligne_selectionnee()["id"] == alerte_id
+
+
+def test_tableau_de_bord_responsable_tuiles_et_periode_semaine(application):
+    connecter(application, "resp")
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    assert vue.periode.valeur() == "semaine"  # vue semaine par défaut pour le responsable
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+
+    assert application.erreurs == []
+    assert hasattr(vue, "dernieres_valeurs_kpi")
+    # Contrairement au planificateur, le tableau de bord du responsable ne montre pas la
+    # liste des alertes ni le tableau des écarts (contenu propre au rôle, cf. le prompt).
+    assert not hasattr(vue, "tableau_alertes")
+    assert not hasattr(vue, "tableau_ecarts")
+
+
+def test_tableau_de_bord_direction_tuiles_et_periode_mois(application):
+    connecter(application, "direction")
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    assert vue.periode.valeur() == "mois"  # vue mois par défaut pour la direction
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+
+    assert application.erreurs == []
+    assert hasattr(vue, "dernieres_valeurs_kpi")
+
+
+def test_tableau_de_bord_navigation_periode(application):
+    connecter(application, "resp")
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+    reference_initiale = vue.periode_reference
+
+    vue._changer_periode(-1)
+    application.racine.update()
+    assert application.erreurs == []
+    assert vue.periode_reference < reference_initiale

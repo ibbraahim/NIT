@@ -132,6 +132,22 @@ def test_lister_kpi_valeurs_calcule_la_tendance(ctx_responsable, site_zone_model
     assert all(v["tendance"] in ("↑", "↓", "→") for v in valeurs)
 
 
+def test_historique_kpi_renvoie_du_plus_ancien_au_plus_recent(ctx_responsable, site_zone_modeles):
+    site_id, zone_id = site_zone_modeles
+    for jour in (date(2026, 1, 4), date(2026, 1, 5), date(2026, 1, 6)):
+        kpi.comparer_kpi_cibles(ctx_responsable, site_id, zone_id, "jour", date_reference=jour)
+    historique = kpi.historique_kpi(
+        ctx_responsable, site_id, zone_id, "ADEQUATION", "jour", nb_periodes=2
+    )
+    assert len(historique) == 2
+    assert historique[0]["date_debut_periode"] <= historique[1]["date_debut_periode"]
+
+
+def test_historique_kpi_code_inconnu_renvoie_une_liste_vide(ctx_responsable, site_zone_modeles):
+    site_id, _zone_id = site_zone_modeles
+    assert kpi.historique_kpi(ctx_responsable, site_id, None, "CODE_INEXISTANT", "mois") == []
+
+
 # ---------------------------------------------------------------------
 # UC15 · Définir les cibles et seuils
 # ---------------------------------------------------------------------

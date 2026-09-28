@@ -468,6 +468,31 @@ def lister_kpi_valeurs(
     return valeurs
 
 
+def historique_kpi(
+    ctx: Contexte,
+    site_id: int,
+    zone_id: int | None,
+    kpi_code: str,
+    periodicite: str,
+    methode: str | None = None,
+    nb_periodes: int = 12,
+) -> list[dict]:
+    """Les ``nb_periodes`` dernières valeurs déjà calculées d'un KPI, de la plus ancienne à la
+    plus récente (tableau de bord Direction : tendances sur 12 mois, progression par rapport
+    à la situation de référence — sa première valeur connue)."""
+    verifier_droit(ctx, "lecture_referentiels")
+    verifier_site(ctx, site_id)
+    with transaction() as cur:
+        depot = DepotKpi(cur)
+        definition = depot.definition_par_code(kpi_code)
+        if definition is None:
+            return []
+        valeurs = depot.historique_valeur(
+            definition["id"], site_id, zone_id, periodicite, methode, nb_periodes
+        )
+    return list(reversed(valeurs))
+
+
 def _tendance(precedentes: list[dict]) -> str:
     """↑ / ↓ / → par rapport à la période précédente (selon le sens du KPI)."""
     if len(precedentes) < 2 or precedentes[0]["valeur"] is None or precedentes[1]["valeur"] is None:
