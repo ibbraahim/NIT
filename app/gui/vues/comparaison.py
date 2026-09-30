@@ -11,7 +11,7 @@ from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampDate, ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
-from app.gui.widgets.graphique import GraphiqueIntegre
+from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.services import admin, alertes, comparaison, kpi, recommandations
 from app.services.droits import a_le_droit
@@ -225,14 +225,16 @@ class VueComparaison(Vue):
                     reel[r["date_jour"]] = reel.get(r["date_jour"], 0.0) + r["heures_reelles"]
 
         def _dessiner(axe):
+            serie_reel = _serie(dates, reel)
             axe.plot(
                 dates,
-                _serie(dates, reel),
+                serie_reel,
                 marker="o",
                 markersize=3,
                 color=COULEURS["primaire"],
                 label="Réalisé",
             )
+            remplissage_degrade(axe, dates, serie_reel, COULEURS["primaire"])
             axe.plot(
                 dates,
                 _serie(dates, rl_par_date),

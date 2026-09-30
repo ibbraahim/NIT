@@ -21,7 +21,7 @@ from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import afficher_erreur
-from app.gui.widgets.graphique import GraphiqueIntegre
+from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.libelles import (
     METHODES_COURTES,
@@ -541,6 +541,7 @@ class VueTableauBord(Vue):
                 color=COULEURS["primaire"],
                 label="Réalisé",
             )
+            remplissage_degrade(axe, libelles, [v["reel"] for _, v in points], COULEURS["primaire"])
             axe.plot(
                 libelles,
                 [v["regression_lineaire"] for _, v in points],
@@ -608,14 +609,16 @@ class VueTableauBord(Vue):
         par_a_temps = {v["date_debut_periode"]: v["valeur"] for v in a_temps}
 
         def _dessiner(axe):
+            serie_adequation = _serie(dates, par_adequation)
             axe.plot(
                 dates,
-                _serie(dates, par_adequation),
+                serie_adequation,
                 marker="o",
                 markersize=3,
                 color=COULEURS["primaire"],
                 label="Adéquation de l'effectif (%)",
             )
+            remplissage_degrade(axe, dates, serie_adequation, COULEURS["primaire"])
             axe.plot(
                 dates,
                 _serie(dates, par_a_temps),

@@ -11,7 +11,7 @@ from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
-from app.gui.widgets.graphique import GraphiqueIntegre
+from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.services import admin, planification
@@ -144,14 +144,16 @@ class VuePrevisions(Vue):
         dates = [l["date_jour"] for l in lignes]
 
         def _dessiner(axe):
+            serie_rl = [l["heures_rl"] for l in lignes]
             axe.plot(
                 dates,
-                [l["heures_rl"] for l in lignes],
+                serie_rl,
                 marker="o",
                 markersize=3,
                 color=COULEURS["primaire"],
                 label="Régression linéaire (RL)",
             )
+            remplissage_degrade(axe, dates, serie_rl, COULEURS["primaire"])
             axe.plot(
                 dates,
                 [l["heures_rn"] for l in lignes],
