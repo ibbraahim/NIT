@@ -39,6 +39,10 @@ from app.config import DOSSIER_IMAGES, DOSSIER_POLICES
 #: Couleur d'accent de marque Workly (milieu du dégradé — voir app.gui.style).
 COULEUR_ACCENT_MARQUE = colors.HexColor("#4C6CF0")
 
+#: Dégradé de marque à 5 accents (mêmes teintes que app.gui.style.COULEURS_DEGRADE_MARQUE,
+#: dupliquées ici pour que ce module reste indépendant de Tkinter/app.gui).
+COULEURS_DEGRADE_MARQUE = ["#22D3EE", "#2FA8F5", "#4C6CF0", "#7B4AE2", "#B24AE2"]
+
 #: Palette des graphiques du rapport (réel, RL, RN — mêmes couleurs que l'écran Comparaison,
 #: reprises ici en dur pour que ce module reste indépendant de Tkinter/app.gui).
 COULEUR_REEL = "#1f4e79"
@@ -75,6 +79,45 @@ def graphique_png(dates: list[date], series: list[tuple[str, list[float], str]])
     FigureCanvasAgg(figure).print_png(tampon)
     tampon.seek(0)
     return tampon
+
+
+def _barre_degradee(largeur: float, hauteur: float, etapes: int = 40) -> Table:
+    """Barre en dégradé de marque à 5 accents : reportlab ne sait pas peindre un dégradé
+    continu, on juxtapose donc ``etapes`` bandes de couleur interpolées (même principe que les
+    « plusieurs teintes juxtaposées » évoqué dans app.gui.style pour les surfaces PDF)."""
+
+    def _hex_vers_rgb(couleur: str) -> tuple[int, int, int]:
+        couleur = couleur.lstrip("#")
+        return tuple(int(couleur[i : i + 2], 16) for i in (0, 2, 4))
+
+    def _couleur_a(t: float) -> colors.Color:
+        segments = len(COULEURS_DEGRADE_MARQUE) - 1
+        position = min(max(t, 0.0), 1.0) * segments
+        indice = min(int(position), segments - 1)
+        local = position - indice
+        debut = _hex_vers_rgb(COULEURS_DEGRADE_MARQUE[indice])
+        fin = _hex_vers_rgb(COULEURS_DEGRADE_MARQUE[indice + 1])
+        rgb = tuple(debut[i] + (fin[i] - debut[i]) * local for i in range(3))
+        return colors.Color(*(v / 255 for v in rgb))
+
+    barre = Table(
+        [[""] * etapes],
+        colWidths=[largeur / etapes] * etapes,
+        rowHeights=[hauteur],
+        hAlign="CENTER",
+    )
+    barre.setStyle(
+        TableStyle(
+            [("BACKGROUND", (i, 0), (i, 0), _couleur_a(i / (etapes - 1))) for i in range(etapes)]
+            + [
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return barre
 
 
 POLICE = "DejaVuSans"
@@ -168,7 +211,7 @@ def _ecrire(
                     ("FONTNAME", (0, 0), (-1, 0), POLICE_GRAS),
                     ("FONTNAME", (0, 1), (-1, -1), POLICE),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f6aa3")),
+                    ("BACKGROUND", (0, 0), (-1, 0), COULEUR_ACCENT_MARQUE),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9d1dc")),
                     (
@@ -234,6 +277,8 @@ def _page_de_garde(titre: str, sous_titre: str) -> list:
         elements.append(image)
     elements.append(Spacer(1, 0.6 * cm))
     elements.append(Paragraph(_echapper(ACCROCHE), style_accroche))
+    elements.append(_barre_degradee(9 * cm, 0.18 * cm))
+    elements.append(Spacer(1, 0.9 * cm))
     elements.append(Paragraph(_echapper(titre), style_titre_garde))
     elements.append(Paragraph(_echapper(sous_titre), style_sous_titre_garde))
     elements.append(PageBreak())

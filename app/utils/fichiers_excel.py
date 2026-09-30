@@ -8,11 +8,16 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Font, PatternFill
 
 from app.erreurs import DonneesInvalides
 
 EXTENSIONS_PRISES_EN_CHARGE = (".csv", ".xlsx")
+
+#: Couleur d'accent de marque Workly (mêmes teintes que app.gui.style, dupliquées ici pour que
+#: ce module reste indépendant de Tkinter/app.gui) : en-tête des feuilles exportées.
+_REMPLISSAGE_ENTETE = PatternFill("solid", fgColor="FF4C6CF0")
+_POLICE_ENTETE = Font(bold=True, color="FFFFFFFF")
 
 
 def lire_lignes_fichier(chemin: Path) -> list[dict[str, Any]]:
@@ -91,7 +96,8 @@ def ecrire_classeur(chemin: Path, feuilles: dict[str, tuple[list[str], list[list
         feuille = classeur.create_sheet(nom[:31])
         feuille.append(en_tetes)
         for cellule in feuille[1]:
-            cellule.font = Font(bold=True)
+            cellule.font = _POLICE_ENTETE
+            cellule.fill = _REMPLISSAGE_ENTETE
         for ligne in lignes:
             feuille.append(ligne)
         for colonne in feuille.columns:
