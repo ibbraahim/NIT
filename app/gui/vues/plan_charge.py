@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from tkinter import ttk
 
 from app.erreurs import ConflitMiseAJour, DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS
+from app.gui.style import COULEURS, PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe, ChampNombre
@@ -169,7 +169,7 @@ class VuePlanCharge(Vue):
             "rejete": COULEURS["rouge"],
         }[plan["statut"]]
         self.label_statut.configure(
-            text=f"Statut : {STATUTS_PLAN[plan['statut']]}", foreground=couleur
+            text=f"{PUCE_STATUT} Statut : {STATUTS_PLAN[plan['statut']]}", foreground=couleur
         )
         self.label_commentaire.configure(
             text=(

@@ -78,6 +78,11 @@ COULEURS_STATUT_CLAIR = {
     "rouge": COULEURS["rouge_clair"],
     "gris": COULEURS["gris_clair"],
 }
+#: Puce devant le texte de statut dans les tableaux (KPI et cibles, Alertes, Plan de charge) :
+#: Tk ne rend pas les émojis couleur (glyphes bitmap/COLR) dans un Treeview, la couleur vient donc
+#: de la couleur de texte de la ligne (tag « vert »/« orange »/« rouge » de TableauTriable), pas
+#: du glyphe lui-même.
+PUCE_STATUT = "●"
 
 TAILLE_POLICE = 10
 

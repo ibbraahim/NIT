@@ -6,6 +6,7 @@ from __future__ import annotations
 from tkinter import ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication
+from app.gui.style import PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe, ChampTexteLong
@@ -108,7 +109,7 @@ class VueAlertes(Vue):
         )
         for ligne in lignes:
             ligne["type_libelle"] = libelle(TYPES_ALERTE, ligne["type"])
-            ligne["niveau_libelle"] = libelle(NIVEAUX_ALERTE, ligne["niveau"])
+            ligne["niveau_libelle"] = f"{PUCE_STATUT} {libelle(NIVEAUX_ALERTE, ligne['niveau'])}"
             ligne["statut_libelle"] = libelle(STATUTS_ALERTE, ligne["statut"])
             ligne["suggestion"] = (
                 ""

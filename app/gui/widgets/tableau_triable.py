@@ -7,8 +7,15 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from tkinter import ttk
 
-from app.gui.style import COULEURS, COULEURS_STATUT_CLAIR
+from app.gui.degrades import melanger
+from app.gui.style import COULEURS, COULEURS_STATUT, COULEURS_STATUT_CLAIR
 from app.utils.format_fr import formater_date, formater_date_heure, formater_nombre
+
+#: Étape de pulsation (toutes les ~800 ms) des lignes taguées « rouge » (alertes ouvertes
+#: critiques) : un ton médian entre le fond pâle habituel et le rouge plein, pour une pulsation
+#: perceptible mais douce, jamais agressive.
+_ROUGE_PULSATION = melanger(COULEURS_STATUT_CLAIR["rouge"], COULEURS_STATUT["rouge"], 0.25)
+_DELAI_PULSATION_MS = 800
 
 
 @dataclass
@@ -67,10 +74,22 @@ class TableauTriable(ttk.Frame):
     pour afficher une arborescence (sites → zones).
     """
 
+    #: Le fond pâle donne la lecture d'ensemble ; le texte (donc la puce « ● » ajoutée devant
+    #: le statut par les écrans appelants) reprend la couleur pleine du statut, un Treeview ne
+    #: sachant colorer qu'un seul aplat de texte par ligne (pas de couleur par caractère).
     ETIQUETTES = {
-        "rouge": {"background": COULEURS_STATUT_CLAIR["rouge"]},
-        "orange": {"background": COULEURS_STATUT_CLAIR["orange"]},
-        "vert": {"background": COULEURS_STATUT_CLAIR["vert"]},
+        "rouge": {
+            "background": COULEURS_STATUT_CLAIR["rouge"],
+            "foreground": COULEURS_STATUT["rouge"],
+        },
+        "orange": {
+            "background": COULEURS_STATUT_CLAIR["orange"],
+            "foreground": COULEURS_STATUT["orange"],
+        },
+        "vert": {
+            "background": COULEURS_STATUT_CLAIR["vert"],
+            "foreground": COULEURS_STATUT["vert"],
+        },
         "gris": {"foreground": COULEURS["gris"]},
         "inactif": {"foreground": COULEURS["desactive"]},
         "gras": {"font": ("", 10, "bold")},
@@ -123,6 +142,27 @@ class TableauTriable(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.message_vide = ttk.Label(self, text="", style="Aide.TLabel")
+        self._pulsation_allumee = False
+        self._id_pulsation: str | None = None
+        self.bind("<Destroy>", self._arreter_pulsation, add="+")
+        self._pulser()
+
+    # --- Pulsation des alertes rouges ---------------------------------------
+    def _pulser(self) -> None:
+        """Fait alterner doucement, toutes les ~800 ms, le fond des lignes taguées « rouge »
+        (alertes ouvertes critiques) entre son ton pâle habituel et un ton médian plus soutenu
+        — attire l'œil sans clignotement agressif."""
+        if not self.arbre.winfo_exists():
+            return
+        self._pulsation_allumee = not self._pulsation_allumee
+        couleur = _ROUGE_PULSATION if self._pulsation_allumee else COULEURS_STATUT_CLAIR["rouge"]
+        self.arbre.tag_configure("rouge", background=couleur)
+        self._id_pulsation = self.after(_DELAI_PULSATION_MS, self._pulser)
+
+    def _arreter_pulsation(self, _evenement=None) -> None:
+        if self._id_pulsation is not None:
+            self.after_cancel(self._id_pulsation)
+            self._id_pulsation = None
 
     # --- Chargement -------------------------------------------------------
     def charger(

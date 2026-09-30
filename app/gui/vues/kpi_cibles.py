@@ -6,6 +6,7 @@ from datetime import date
 from tkinter import ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication, OperationImpossible
+from app.gui.style import PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampCase, ChampDate, ChampListe, ChampNombre, appliquer_erreurs
@@ -204,7 +205,7 @@ class OngletSuiviKpi(ttk.Frame):
             ligne["methode_libelle"] = METHODES_COURTES.get(ligne["methode"], "—")
             ligne["valeur_affichee"] = _formater_valeur(ligne["valeur"], ligne["unite"])
             ligne["cible_affichee"] = _formater_valeur(ligne["cible"], ligne["unite"])
-            ligne["statut_libelle"] = libelle(STATUTS_KPI, ligne["statut"])
+            ligne["statut_libelle"] = f"{PUCE_STATUT} {libelle(STATUTS_KPI, ligne['statut'])}"
         self._lignes = lignes
         self._filtrer_tableau()
 

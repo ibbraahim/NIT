@@ -16,6 +16,7 @@ from app.gui.style import (
     COULEURS_DEGRADE_MARQUE,
     COULEURS_STATUT,
     COULEURS_STATUT_CLAIR,
+    PUCE_STATUT,
 )
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
@@ -457,7 +458,7 @@ class VueTableauBord(Vue):
         ouvertes = self.executer(lambda: alertes.lister_alertes_ouvertes(self.ctx, site_id)) or []
         for ligne in ouvertes:
             ligne["type_libelle"] = libelle(TYPES_ALERTE, ligne["type"])
-            ligne["niveau_libelle"] = libelle(NIVEAUX_ALERTE, ligne["niveau"])
+            ligne["niveau_libelle"] = f"{PUCE_STATUT} {libelle(NIVEAUX_ALERTE, ligne['niveau'])}"
         tableau.charger(
             ouvertes,
             cle_id="id",
