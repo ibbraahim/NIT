@@ -10,7 +10,9 @@ from collections.abc import Sequence
 from datetime import date
 from tkinter import ttk
 
+from app.gui.icones import icone_oeil
 from app.gui.style import COULEUR_FOND_MARQUE, COULEURS
+from app.gui.widgets.infobulle import InfoBulle
 from app.utils.format_fr import formater_date, formater_nombre, lire_date, lire_nombre
 
 
@@ -73,12 +75,41 @@ class Champ(ttk.Frame):
 
 
 class ChampTexte(Champ):
-    """Saisie d'une ligne de texte (``masque=True`` pour un mot de passe)."""
+    """Saisie d'une ligne de texte (``masque=True`` pour un mot de passe, avec icône « œil »
+    cliquable à l'intérieur du champ pour basculer l'affichage)."""
+
+    def __init__(self, parent, libelle: str, aide: str = "", **options) -> None:
+        self._masque = bool(options.get("masque", False))
+        self._affiche = False
+        super().__init__(parent, libelle, aide, **options)
+        if self._masque:
+            self._construire_bouton_oeil()
 
     def _creer_saisie(self, largeur: int = 28, masque: bool = False, **options) -> tk.Widget:
         self.variable = tk.StringVar()
         return ttk.Entry(
             self, textvariable=self.variable, width=largeur, show="•" if masque else "", **options
+        )
+
+    def _construire_bouton_oeil(self) -> None:
+        sur_marque = self.style_normal == "Marque.TEntry"
+        couleur = "#9aa4c2" if sur_marque else COULEURS["texte_secondaire"]
+        fond = "#16204a" if sur_marque else COULEURS["surface"]
+        self._icone_ouvert = tk.PhotoImage(file=str(icone_oeil(couleur, False)))
+        self._icone_barre = tk.PhotoImage(file=str(icone_oeil(couleur, True)))
+        self._bouton_oeil = tk.Label(self, image=self._icone_barre, background=fond, cursor="hand2")
+        self._bouton_oeil.place(in_=self.saisie, relx=1.0, rely=0.5, anchor="e", x=-6)
+        self._infobulle_oeil = InfoBulle(self._bouton_oeil, "Afficher le mot de passe")
+        self._bouton_oeil.bind("<Button-1>", lambda _e: self._basculer_affichage())
+
+    def _basculer_affichage(self) -> None:
+        self._affiche = not self._affiche
+        self.saisie.configure(show="" if self._affiche else "•")
+        self._bouton_oeil.configure(
+            image=self._icone_ouvert if self._affiche else self._icone_barre
+        )
+        self._infobulle_oeil.definir(
+            "Masquer le mot de passe" if self._affiche else "Afficher le mot de passe"
         )
 
     def valeur(self) -> str:

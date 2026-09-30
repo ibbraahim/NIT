@@ -15,10 +15,10 @@ matplotlib.rcParams["axes.unicode_minus"] = False
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from app.gui.style import COULEUR_ACCENT_MILIEU, COULEURS  # noqa: E402
+from app.gui.style import COULEUR_ACCENT_3, COULEURS  # noqa: E402
 
 # En-têtes de graphiques dans l'accent de marque (identité Workly).
-matplotlib.rcParams["axes.titlecolor"] = COULEUR_ACCENT_MILIEU
+matplotlib.rcParams["axes.titlecolor"] = COULEUR_ACCENT_3
 matplotlib.rcParams["axes.titleweight"] = "bold"
 
 #: Palette de séries, dans l'ordre d'utilisation habituel (réel, RL, RN, capacité…).

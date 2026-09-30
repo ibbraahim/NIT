@@ -7,7 +7,7 @@ from tkinter import ttk
 
 from app import ACCROCHE, NOM_APPLICATION, REPERE_TECHNIQUE, VERSION
 from app.config import DOSSIER_IMAGES
-from app.gui.style import COULEUR_ACCENT_DEBUT, COULEUR_ACCENT_FIN, COULEUR_FOND_MARQUE
+from app.gui.style import COULEUR_ACCENT_2, COULEUR_ACCENT_4, COULEUR_FOND_MARQUE
 from app.gui.widgets.dialogues import DialogueBase
 
 SITUATION = (
@@ -105,7 +105,7 @@ class FenetreAPropos(DialogueBase):
         texte.tag_configure(
             "titre",
             font=("", 12, "bold"),
-            foreground=COULEUR_ACCENT_DEBUT,
+            foreground=COULEUR_ACCENT_2,
             spacing1=10,
             spacing3=4,
         )
@@ -113,7 +113,7 @@ class FenetreAPropos(DialogueBase):
         texte.tag_configure("niveau0", lmargin1=8, lmargin2=8, font=("", 10, "bold"))
         texte.tag_configure("niveau1", lmargin1=28, lmargin2=40)
         texte.tag_configure("niveau2", lmargin1=48, lmargin2=60)
-        texte.tag_configure("focus", foreground=COULEUR_ACCENT_FIN, font=("", 10, "bold"))
+        texte.tag_configure("focus", foreground=COULEUR_ACCENT_4, font=("", 10, "bold"))
         for titre, contenu in (
             ("La situation", SITUATION),
             ("Le problème", PROBLEME),

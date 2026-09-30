@@ -11,7 +11,8 @@ from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
 from app.gui.connexion import EcranConnexion
-from app.gui.style import COULEUR_FOND_MARQUE, COULEURS, appliquer_style
+from app.gui.degrades import image_degradee
+from app.gui.style import COULEUR_FOND_MARQUE, COULEURS, COULEURS_DEGRADE_MARQUE, appliquer_style
 from app.gui.vues import ACCUEIL, ecran, ecrans_autorises
 from app.gui.widgets.dialogues import afficher_erreur, franciser_tk
 from app.journal import journal
@@ -128,6 +129,15 @@ class Application:
     def _construire_bandeau(self) -> None:
         bandeau = ttk.Frame(self._cadre, style="Bandeau.TFrame", padding=(16, 10))
         bandeau.pack(fill="x")
+        if not hasattr(self, "_fond_bandeau"):
+            # Largeur proche de l'espace habituellement visible entre le bloc de gauche (logo,
+            # titre) et celui de droite (utilisateur, bouton) : le dégradé complet (5 teintes)
+            # s'y déploie, plutôt que de n'en montrer qu'un fragment sur une image très large.
+            chemin_fond = image_degradee(900, 72, COULEURS_DEGRADE_MARQUE)
+            self._fond_bandeau = tk.PhotoImage(file=str(chemin_fond))
+        tk.Label(
+            bandeau, image=self._fond_bandeau, background=COULEUR_FOND_MARQUE, borderwidth=0
+        ).place(x=0, y=0, relwidth=1, relheight=1, anchor="nw")
         if not hasattr(self, "_logo_bandeau"):
             self._logo_bandeau = tk.PhotoImage(
                 file=str(DOSSIER_IMAGES / "logo_workly_88.png")

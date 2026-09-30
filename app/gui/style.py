@@ -37,20 +37,32 @@ COULEURS = {
     "infobulle": "#EEF1FE",
 }
 
-#: Identité de marque Workly : fond sombre réservé au bandeau, à l'écran de connexion, à
-#: l'écran « À propos » et à la page de garde des rapports ; dégradé d'accent (début → milieu
-#: → fin) pour les boutons principaux, les en-têtes de graphiques, les barres de progression et
-#: les éléments actifs du menu. Le reste de l'interface (formulaires, tableaux, écrans de
-#: travail) garde le thème clair ci-dessous.
+#: Identité de marque Workly : fond sombre (deux profondeurs) réservé au bandeau, à l'écran
+#: de connexion, à l'écran « À propos » et à la page de garde des rapports ; dégradé à 5
+#: accents (froid → chaud) pour les boutons principaux, les en-têtes de graphiques, les
+#: barres de progression et les éléments actifs du menu. Le reste de l'interface (formulaires,
+#: tableaux, écrans de travail) garde le thème clair ci-dessous, avec le dégradé en touches.
 COULEUR_FOND_MARQUE = "#0A1128"
-COULEUR_ACCENT_DEBUT = "#2FA8F5"
-COULEUR_ACCENT_MILIEU = "#4C6CF0"
-COULEUR_ACCENT_FIN = "#7B4AE2"
+COULEUR_FOND_MARQUE_PROFOND = "#070C1C"
+COULEUR_ACCENT_1 = "#22D3EE"  # cyan
+COULEUR_ACCENT_2 = "#2FA8F5"  # bleu ciel
+COULEUR_ACCENT_3 = "#4C6CF0"  # bleu indigo
+COULEUR_ACCENT_4 = "#7B4AE2"  # violet
+COULEUR_ACCENT_5 = "#B24AE2"  # magenta
+#: Les 5 accents, du froid au chaud : le dégradé de marque complet.
+COULEURS_DEGRADE_MARQUE = [
+    COULEUR_ACCENT_1,
+    COULEUR_ACCENT_2,
+    COULEUR_ACCENT_3,
+    COULEUR_ACCENT_4,
+    COULEUR_ACCENT_5,
+]
 #: Une seule application ttk (boutons, barres de progression…) ne peut pas peindre un véritable
-#: dégradé multi-couleurs : c'est cette teinte représentative, tirée du milieu du dégradé, qui
-#: sert de couleur d'accent partout où ttk l'exige. Les zones de marque à surface fixe (bandeau
-#: de connexion, page de garde PDF) utilisent, elles, le vrai dégradé rendu en image.
-COULEUR_ACCENT = COULEUR_ACCENT_MILIEU
+#: dégradé multi-couleurs sur un widget quelconque : c'est cette teinte représentative, tirée du
+#: centre du dégradé, qui sert de couleur d'accent partout où ttk l'exige. Les zones à surface
+#: fixe (bandeau, connexion, boutons principaux, page de garde PDF) utilisent, elles, le vrai
+#: dégradé (image générée par app.gui.degrades, ou plusieurs teintes juxtaposées en PDF).
+COULEUR_ACCENT = COULEUR_ACCENT_3
 
 #: Couleur associée à chaque statut de KPI ou niveau d'alerte.
 COULEURS_STATUT = {
@@ -129,17 +141,17 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     style.configure(
         "BandeauRepere.TLabel",
         background=COULEUR_FOND_MARQUE,
-        foreground=COULEUR_ACCENT_DEBUT,
+        foreground=COULEUR_ACCENT_2,
         font=(famille, 9),
     )
     style.configure(
         "Bandeau.TButton",
-        background=COULEUR_ACCENT_MILIEU,
+        background=COULEUR_ACCENT_3,
         foreground="#ffffff",
-        bordercolor=COULEUR_ACCENT_MILIEU,
+        bordercolor=COULEUR_ACCENT_3,
         padding=(10, 4),
     )
-    style.map("Bandeau.TButton", background=[("active", COULEUR_ACCENT_FIN)])
+    style.map("Bandeau.TButton", background=[("active", COULEUR_ACCENT_4)])
 
     # Écrans de marque (connexion, À propos) : fond sombre
     style.configure("Marque.TFrame", background=COULEUR_FOND_MARQUE)
@@ -152,7 +164,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     style.configure(
         "MarqueAccroche.TLabel",
         background=COULEUR_FOND_MARQUE,
-        foreground=COULEUR_ACCENT_DEBUT,
+        foreground=COULEUR_ACCENT_2,
         font=(famille, 11),
     )
     style.configure(
@@ -200,13 +212,13 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     )
     style.configure(
         "Primaire.TButton",
-        background=COULEUR_ACCENT_MILIEU,
+        background=COULEUR_ACCENT_3,
         foreground="#ffffff",
-        bordercolor=COULEUR_ACCENT_MILIEU,
+        bordercolor=COULEUR_ACCENT_3,
     )
     style.map(
         "Primaire.TButton",
-        background=[("disabled", c["gris_clair"]), ("active", COULEUR_ACCENT_FIN)],
+        background=[("disabled", c["gris_clair"]), ("active", COULEUR_ACCENT_4)],
         foreground=[("disabled", c["desactive"])],
     )
 
@@ -217,7 +229,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         fieldbackground="#16204a",
         foreground="#ffffff",
         insertcolor="#ffffff",
-        bordercolor=COULEUR_ACCENT_MILIEU,
+        bordercolor=COULEUR_ACCENT_3,
         lightcolor="#16204a",
         darkcolor="#16204a",
         padding=3,
@@ -285,10 +297,10 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         font=(famille, 11),
         borderwidth=0,
     )
-    style.map("Navigation.Treeview", background=[("selected", COULEUR_ACCENT_MILIEU)])
+    style.map("Navigation.Treeview", background=[("selected", COULEUR_ACCENT_3)])
     style.layout("Navigation.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
     style.configure("Navigation.TFrame", background=COULEUR_FOND_MARQUE)
 
     # Barres de progression
-    style.configure("TProgressbar", background=COULEUR_ACCENT_MILIEU, troughcolor=c["gris_clair"])
+    style.configure("TProgressbar", background=COULEUR_ACCENT_3, troughcolor=c["gris_clair"])
     return style

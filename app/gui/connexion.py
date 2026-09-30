@@ -10,7 +10,8 @@ from app import ACCROCHE, NOM_APPLICATION, VERSION
 from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
-from app.gui.style import COULEUR_FOND_MARQUE
+from app.gui.degrades import image_lueur_radiale, melanger
+from app.gui.style import COULEUR_ACCENT_4, COULEUR_FOND_MARQUE, COULEUR_FOND_MARQUE_PROFOND
 from app.gui.widgets.champs import ChampTexte
 from app.journal import journal
 from app.services import auth
@@ -27,6 +28,14 @@ class EcranConnexion(ttk.Frame):
     ) -> None:
         super().__init__(parent, style="Marque.TFrame")
         self.sur_connexion = sur_connexion
+
+        centre_lueur = melanger(COULEUR_ACCENT_4, COULEUR_FOND_MARQUE_PROFOND, 0.45)
+        chemin_fond = image_lueur_radiale(1400, 850, centre_lueur, COULEUR_FOND_MARQUE_PROFOND)
+        self._fond = tk.PhotoImage(file=str(chemin_fond))
+        tk.Label(
+            self, image=self._fond, background=COULEUR_FOND_MARQUE_PROFOND, borderwidth=0
+        ).place(x=0, y=0, relwidth=1, relheight=1)
+
         carte = ttk.Frame(self, style="Marque.TFrame", padding=32)
         carte.place(relx=0.5, rely=0.45, anchor="center")
 
