@@ -204,6 +204,7 @@ class ChampDate(Champ):
     def _creer_saisie(self, largeur: int = 12) -> tk.Widget:
         from tkcalendar import DateEntry
 
+        c = COULEURS
         return DateEntry(
             self,
             width=largeur,
@@ -211,6 +212,21 @@ class ChampDate(Champ):
             date_pattern="dd/MM/yyyy",
             firstweekday="monday",
             showweeknumbers=False,
+            background=c["accent"],
+            foreground="#ffffff",
+            bordercolor=c["bordure"],
+            headersbackground=c["surface_2"],
+            headersforeground=c["texte_secondaire"],
+            normalbackground=c["surface"],
+            normalforeground=c["texte"],
+            weekendbackground=c["surface"],
+            weekendforeground=c["texte_secondaire"],
+            othermonthbackground=c["surface_2"],
+            othermonthforeground=c["desactive"],
+            othermonthwebackground=c["surface_2"],
+            othermonthweforeground=c["desactive"],
+            selectbackground=c["accent"],
+            selectforeground="#ffffff",
         )
 
     def valeur(self) -> date:
@@ -271,10 +287,13 @@ class ChampTexteLong(ttk.Frame):
             height=hauteur,
             width=largeur,
             wrap="word",
-            relief="solid",
-            borderwidth=1,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=6,
             highlightthickness=1,
-            highlightcolor=COULEURS["primaire_clair"],
+            highlightbackground=COULEURS["champ_bordure"],
+            highlightcolor=COULEURS["accent"],
         )
         self.saisie.grid(row=1, column=0, sticky="nsew", pady=(2, 0))
         self._aide = aide
@@ -298,7 +317,7 @@ class ChampTexteLong(ttk.Frame):
 
     def effacer_erreur(self) -> None:
         self.saisie.configure(
-            highlightbackground=COULEURS["bordure"], highlightcolor=COULEURS["primaire_clair"]
+            highlightbackground=COULEURS["champ_bordure"], highlightcolor=COULEURS["accent"]
         )
         self.message.configure(text=self._aide, style="Aide.TLabel")
 

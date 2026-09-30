@@ -6,24 +6,17 @@ import tkinter as tk
 from datetime import date, timedelta
 from tkinter import ttk
 
-import numpy as np
-
 from app.erreurs import ErreurApplication
-from app.gui.degrades import image_degradee
-from app.gui.style import (
-    COULEUR_ACCENT_3,
-    COULEURS,
-    COULEURS_DEGRADE_MARQUE,
-    COULEURS_STATUT,
-    COULEURS_STATUT_CLAIR,
-    PUCE_STATUT,
-)
+from app.gui.style import COULEURS, COULEURS_STATUT, PUCE_STATUT
 from app.gui.vues.base import Vue
-from app.gui.widgets.bouton import Bouton
+from app.gui.widgets.carte import Carte
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import afficher_erreur
-from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
+from app.gui.widgets.entete import BoutonIcone
+from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
+from app.gui.widgets.kpi import CarteHero, carte_stat
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
+from app.gui.widgets.traces import anneau, barres_groupees, jauge
 from app.libelles import (
     METHODES_COURTES,
     NIVEAUX_ALERTE,
@@ -39,7 +32,12 @@ from app.utils.format_fr import formater_date, formater_nombre, formater_pourcen
 OPTIONS_PERIODICITE = list(PERIODICITES.items())
 PERIODICITE_PAR_DEFAUT = {"planificateur": "jour", "responsable": "semaine", "direction": "mois"}
 
-LIBELLES_STATUT = {"vert": "Conforme", "orange": "Vigilance", "rouge": "Critique"}
+LIBELLES_STATUT = {
+    "vert": "Conforme",
+    "orange": "Vigilance",
+    "rouge": "Critique",
+    "gris": "Sans objectif",
+}
 
 TUILES_PLANIFICATEUR = [
     ("ADEQUATION", "Adéquation de l'effectif"),
@@ -58,6 +56,8 @@ TUILES_DIRECTION = [
     ("COUT_UNITE", "Coût RH par unité traitée"),
     ("ECART_COUT", "Écart de coût prévu / réel"),
 ]
+#: Les deux premières cartes d'une rangée sont des cartes « héros » en dégradé.
+DEGRADES_TUILES = ("rose", "cyan")
 
 COLONNES_ECARTS = [
     Colonne("zone", "Zone", 140),
@@ -79,11 +79,13 @@ COLONNES_ECARTS = [
 
 COLONNES_ALERTES = [
     Colonne("type_libelle", "Type", 170),
-    Colonne("niveau_libelle", "Niveau", 80, "center"),
+    Colonne("niveau_libelle", "Niveau", 90, "center"),
     Colonne("zone", "Zone", 110),
     Colonne("date_concernee", "Date concernée", 110, "center"),
-    Colonne("message", "Message", 380),
+    Colonne("message", "Message", 340),
 ]
+
+ECART_CARTES = 16
 
 
 def _formater_valeur(valeur, unite) -> str:
@@ -101,87 +103,6 @@ def _trouver_kpi(valeurs: list[dict], code: str) -> dict | None:
     return next((v for v in valeurs if v["kpi_code"] == code), None)
 
 
-def _lier_survol_tuile(cadre: tk.Frame, couleur_repos: str, couleur_survol: str) -> None:
-    """Illumine la bordure de ``cadre`` au survol de la tuile (élévation légère, équivalent
-    statique du « hover » de la référence visuelle). Lié à tous les descendants : les
-    événements Entrer/Sortir de Tk ne remontent pas d'un enfant vers son parent, et un « Sortir »
-    déclenché en passant d'un enfant à un autre (donc toujours à l'intérieur de la tuile) est
-    ignoré grâce à une vérification du widget réellement sous le pointeur."""
-
-    def _entrer(_evenement=None) -> None:
-        cadre.configure(highlightbackground=couleur_survol, highlightcolor=couleur_survol)
-
-    def _sortir(_evenement=None) -> None:
-        x, y = cadre.winfo_pointerxy()
-        sous_pointeur = cadre.winfo_containing(x, y)
-        if sous_pointeur is not None and str(sous_pointeur).startswith(str(cadre)):
-            return
-        cadre.configure(highlightbackground=couleur_repos, highlightcolor=couleur_repos)
-
-    for widget in (cadre, *cadre.winfo_children()):
-        widget.bind("<Enter>", _entrer, add="+")
-        widget.bind("<Leave>", _sortir, add="+")
-        for petit_enfant in widget.winfo_children():
-            petit_enfant.bind("<Enter>", _entrer, add="+")
-            petit_enfant.bind("<Leave>", _sortir, add="+")
-
-
-def _construire_tuile(
-    parent: tk.Widget, titre: str, valeur_texte: str, cible_texte: str, statut
-) -> tk.Frame:
-    """Une carte KPI colorée selon son statut (vert/orange/rouge/gris), avec une fine bande en
-    dégradé de marque en haut et une bordure qui s'illumine légèrement au survol."""
-    couleur_bordure_repos = COULEURS["gris_clair"]
-    cadre = tk.Frame(
-        parent,
-        background=COULEURS["surface"],
-        highlightthickness=1,
-        highlightbackground=couleur_bordure_repos,
-        highlightcolor=couleur_bordure_repos,
-        borderwidth=0,
-    )
-    bande = tk.Canvas(cadre, height=4, highlightthickness=0, background=COULEURS["surface"])
-    bande.pack(fill="x", side="top")
-    bande._image_degradee = None  # référence conservée pour éviter le ramasse-miettes de Tk
-
-    def _redessiner_bande(_evenement=None) -> None:
-        largeur = bande.winfo_width()
-        if largeur <= 1:
-            return
-        chemin = image_degradee(largeur, 4, COULEURS_DEGRADE_MARQUE)
-        bande._image_degradee = tk.PhotoImage(file=str(chemin))
-        bande.delete("all")
-        bande.create_image(0, 0, anchor="nw", image=bande._image_degradee)
-
-    bande.bind("<Configure>", _redessiner_bande)
-
-    corps = tk.Frame(cadre, background=COULEURS["surface"])
-    corps.pack(fill="both", expand=True, padx=12, pady=(8, 12))
-    fond = {"background": COULEURS["surface"]}
-    tk.Label(
-        corps, text=titre, font=("", 9, "bold"), foreground=COULEURS["texte_secondaire"], **fond
-    ).pack(anchor="w")
-    tk.Label(
-        corps, text=valeur_texte, font=("", 20, "bold"), foreground=COULEURS["texte"], **fond
-    ).pack(anchor="w", pady=(2, 0))
-    if cible_texte:
-        tk.Label(
-            corps, text=cible_texte, font=("", 9), foreground=COULEURS["texte_secondaire"], **fond
-        ).pack(anchor="w")
-    if statut is not None:
-        tk.Label(
-            corps,
-            text=LIBELLES_STATUT.get(statut, "Non calculé"),
-            font=("", 8, "bold"),
-            background=COULEURS_STATUT_CLAIR.get(statut, COULEURS["gris_clair"]),
-            foreground=COULEURS_STATUT.get(statut, COULEURS["gris"]),
-            padx=8,
-            pady=2,
-        ).pack(anchor="w", pady=(8, 0))
-    _lier_survol_tuile(cadre, couleur_bordure_repos, COULEUR_ACCENT_3)
-    return cadre
-
-
 def _serie(dates: list[date], valeurs_par_date: dict[date, float | None]) -> list[float]:
     """Valeurs alignées sur ``dates``, ``nan`` là où le KPI n'a pas encore été calculé (pour
     que le tracé laisse un blanc plutôt que d'échouer)."""
@@ -189,8 +110,8 @@ def _serie(dates: list[date], valeurs_par_date: dict[date, float | None]) -> lis
 
 
 class VueTableauBord(Vue):
-    """Filtres Site/Zone/Période/Date, navigation de période, et contenu propre à chaque
-    rôle (planificateur, responsable, direction)."""
+    """Filtres Site/Zone/Période, navigation de période, et contenu propre à chaque rôle
+    (planificateur, responsable, direction), en cartes."""
 
     titre = "Tableau de bord"
     sous_titre = "Vue d'ensemble adaptée au rôle"
@@ -201,29 +122,36 @@ class VueTableauBord(Vue):
         self.voit_le_plan = a_le_droit(self.ctx, "lecture_plan")
         self.periode_reference = date.today()
 
-        barre = ttk.Frame(self.contenu)
-        barre.pack(fill="x", pady=(0, 6))
-        self.site = ChampListe(barre, "Site", largeur=22)
+        filtres = Carte(self.contenu, marge=14)
+        filtres.pack(fill="x")
+        barre = filtres.zone
+        self.site = ChampListe(barre, "Site", largeur=20)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
-        self.zone = ChampListe(barre, "Zone", largeur=18)
+        self.zone = ChampListe(barre, "Zone", largeur=15)
         self.zone.pack(side="left", padx=(16, 0))
         self.zone.sur_changement(self.actualiser_donnees)
-        self.periode = ChampListe(barre, "Période", options=OPTIONS_PERIODICITE, largeur=12)
+        self.periode = ChampListe(barre, "Période", options=OPTIONS_PERIODICITE, largeur=9)
         self.periode.definir(PERIODICITE_PAR_DEFAUT.get(self.ctx.role, "semaine"))
         self.periode.pack(side="left", padx=(16, 0))
         self.periode.sur_changement(self._sur_changement_periode)
 
         nav = ttk.Frame(barre)
-        nav.pack(side="left", padx=(24, 0), pady=(14, 0))
-        Bouton(nav, "◀ Période précédente", lambda: self._changer_periode(-1)).pack(side="left")
-        self.label_periode = ttk.Label(nav, text="", style="Gras.TLabel")
-        self.label_periode.pack(side="left", padx=10)
-        Bouton(nav, "Période suivante ▶", lambda: self._changer_periode(1)).pack(side="left")
-        Bouton(nav, "Actualiser", self.actualiser_donnees).pack(side="left", padx=(16, 0))
+        nav.pack(side="right", pady=(16, 0))
+        BoutonIcone(
+            nav, "chevron_gauche", lambda: self._changer_periode(-1), "Période précédente", 36
+        ).pack(side="left")
+        self.label_periode = ttk.Label(nav, text="", style="Gras.TLabel", width=33, anchor="center")
+        self.label_periode.pack(side="left", padx=8)
+        BoutonIcone(
+            nav, "chevron_droite", lambda: self._changer_periode(1), "Période suivante", 36
+        ).pack(side="left")
+        BoutonIcone(nav, "rafraichir", self.actualiser_donnees, "Actualiser les données", 36).pack(
+            side="left", padx=(14, 0)
+        )
 
-        self.cadre_contenu = ttk.Frame(self.contenu)
-        self.cadre_contenu.pack(fill="both", expand=True, pady=(8, 0))
+        self.cadre_contenu = ttk.Frame(self.contenu, style="Page.TFrame")
+        self.cadre_contenu.pack(fill="both", expand=True, pady=(ECART_CARTES, 0))
 
     # --- Chargement ---------------------------------------------------------
     def actualiser(self) -> None:
@@ -272,7 +200,7 @@ class VueTableauBord(Vue):
             text=libelle_periode(self.periode_reference, periodicite).capitalize()
         )
         if site_id is None:
-            ttk.Label(self.cadre_contenu, text="Choisissez un site.", style="Aide.TLabel").pack(
+            ttk.Label(self.cadre_contenu, text="Choisissez un site.", style="PageAide.TLabel").pack(
                 anchor="w"
             )
             return
@@ -283,22 +211,110 @@ class VueTableauBord(Vue):
         elif self.ctx.role == "direction":
             self._construire_direction(site_id, zone_id, periodicite)
 
+    # --- Briques de mise en page -------------------------------------------------
+    def _rangee(self, poids: list[int]) -> ttk.Frame:
+        """Rangée de cartes en colonnes proportionnelles à ``poids``."""
+        ligne = ttk.Frame(self.cadre_contenu, style="Page.TFrame")
+        ligne.pack(fill="x", pady=(0, ECART_CARTES))
+        for colonne, poids_colonne in enumerate(poids):
+            ligne.columnconfigure(colonne, weight=poids_colonne, uniform="colonne")
+        ligne.rowconfigure(0, weight=1)
+        return ligne
+
+    @staticmethod
+    def _placer(ligne: ttk.Frame, carte: tk.Widget, colonne: int, total: int) -> None:
+        carte.grid(
+            row=0,
+            column=colonne,
+            sticky="nsew",
+            padx=(0, ECART_CARTES if colonne < total - 1 else 0),
+        )
+
+    def _carte_indicateur(
+        self, ligne: ttk.Frame, colonne: int, total: int, titre: str, trouve: dict | None
+    ) -> None:
+        if trouve is None:
+            valeur, detail, statut, libelle_statut = "—", "Pas encore calculé", None, "Non calculé"
+        else:
+            valeur = _formater_valeur(trouve["valeur"], trouve["unite"])
+            detail = f"Cible {_formater_valeur(trouve['cible'], trouve['unite'])}"
+            statut = trouve["statut"]
+            libelle_statut = LIBELLES_STATUT.get(statut, "Non calculé")
+        if colonne < len(DEGRADES_TUILES):
+            carte = CarteHero(
+                ligne, titre, valeur, detail, libelle_statut, DEGRADES_TUILES[colonne]
+            )
+        else:
+            carte = carte_stat(ligne, titre, valeur, detail, statut, libelle_statut)
+        self._placer(ligne, carte, colonne, total)
+
     def _construire_tuiles(self, codes: list[tuple[str, str]], valeurs: list[dict]) -> None:
-        ligne = ttk.Frame(self.cadre_contenu)
-        ligne.pack(fill="x", pady=(0, 12))
-        for code, titre in codes:
-            trouve = _trouver_kpi(valeurs, code)
-            if trouve is None:
-                tuile = _construire_tuile(ligne, titre, "—", "Pas encore calculé", None)
-            else:
-                tuile = _construire_tuile(
-                    ligne,
-                    titre,
-                    _formater_valeur(trouve["valeur"], trouve["unite"]),
-                    f"Cible {_formater_valeur(trouve['cible'], trouve['unite'])}",
-                    trouve["statut"],
-                )
-            tuile.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        ligne = self._rangee([1] * len(codes))
+        for colonne, (code, titre) in enumerate(codes):
+            self._carte_indicateur(ligne, colonne, len(codes), titre, _trouver_kpi(valeurs, code))
+
+    def _carte_graphique(
+        self,
+        ligne: ttk.Frame,
+        colonne: int,
+        total: int,
+        titre: str,
+        sous_titre: str = "",
+        largeur: float = 5.4,
+        hauteur: float = 2.7,
+    ) -> GraphiqueIntegre:
+        carte = Carte(ligne, titre, sous_titre)
+        self._placer(ligne, carte, colonne, total)
+        graphique = GraphiqueIntegre(carte.zone, largeur=largeur, hauteur=hauteur)
+        graphique.pack(fill="both", expand=True)
+        return graphique
+
+    def _carte_anneau(
+        self,
+        ligne: ttk.Frame,
+        colonne: int,
+        total: int,
+        titre: str,
+        sous_titre: str,
+        parts: list[tuple[str, int, str]],
+        libelle_total: str,
+    ) -> None:
+        """Anneau de répartition : ``parts`` = ``(libellé, effectif, couleur)``, légende dessous."""
+        carte = Carte(ligne, titre, sous_titre)
+        self._placer(ligne, carte, colonne, total)
+        graphique = GraphiqueIntegre(carte.zone, largeur=2.8, hauteur=2.1)
+        graphique.pack(fill="both", expand=True)
+        valeurs = [n for _l, n, _c in parts]
+        graphique.dessiner(
+            lambda axe: anneau(
+                axe,
+                valeurs,
+                [c for _l, _n, c in parts],
+                centre=str(sum(valeurs)),
+                sous_centre=libelle_total,
+            )
+        )
+        legende = ttk.Frame(carte.zone)
+        legende.pack(fill="x", pady=(8, 0))
+        for libelle_part, effectif, couleur in parts:
+            ligne_legende = ttk.Frame(legende)
+            ligne_legende.pack(fill="x", pady=1)
+            ttk.Label(ligne_legende, text=PUCE_STATUT, foreground=couleur).pack(side="left")
+            ttk.Label(ligne_legende, text=libelle_part).pack(side="left", padx=(6, 0))
+            ttk.Label(ligne_legende, text=str(effectif), style="Gras.TLabel").pack(side="right")
+
+    def _tableau_dans_carte(
+        self,
+        conteneur: tk.Widget,
+        titre: str,
+        sous_titre: str,
+        colonnes: list[Colonne],
+        hauteur: int,
+    ) -> tuple[Carte, TableauTriable]:
+        carte = Carte(conteneur, titre, sous_titre)
+        tableau = TableauTriable(carte.zone, colonnes, hauteur=hauteur)
+        tableau.pack(fill="both", expand=True)
+        return carte, tableau
 
     # =====================================================================
     # Planificateur (vue jour par défaut)
@@ -309,30 +325,49 @@ class VueTableauBord(Vue):
         valeurs = self._valeurs_kpi(site_id, zone_id, periodicite)
         self._construire_tuiles(TUILES_PLANIFICATEUR, valeurs)
 
-        graphiques = ttk.Frame(self.cadre_contenu)
-        graphiques.pack(fill="both", pady=(0, 12))
-        graphique_besoin = GraphiqueIntegre(graphiques, largeur=7, hauteur=2.6)
-        graphique_besoin.pack(side="left", fill="both", expand=True)
-        graphique_eqp = GraphiqueIntegre(graphiques, largeur=3.2, hauteur=2.6)
-        graphique_eqp.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        ligne = self._rangee([3, 2])
+        graphique_besoin = self._carte_graphique(
+            ligne, 0, 2, "Besoin prévu et capacité", "Heures par zone, J+1 à J+7"
+        )
+        graphique_eqp = self._carte_graphique(
+            ligne, 1, 2, "Disponibilité des équipements", "Taux sur la période", 3.2
+        )
         self._dessiner_besoin_vs_capacite(graphique_besoin, site_id)
         self._dessiner_gauge_equipements(graphique_eqp, valeurs)
 
-        ttk.Label(self.cadre_contenu, text="Écarts de la veille", style="Section.TLabel").pack(
-            anchor="w", pady=(0, 4)
+        carte_ecarts, self.tableau_ecarts = self._tableau_dans_carte(
+            self.cadre_contenu, "Écarts de la veille", "Prévu contre réalisé", COLONNES_ECARTS, 6
         )
-        self.tableau_ecarts = TableauTriable(self.cadre_contenu, COLONNES_ECARTS, hauteur=6)
-        self.tableau_ecarts.pack(fill="both", expand=True, pady=(0, 12))
+        carte_ecarts.pack(fill="x", pady=(0, ECART_CARTES))
         self._charger_ecarts_veille(self.tableau_ecarts, site_id, zone_id)
 
         if self.voit_les_alertes:
-            ttk.Label(self.cadre_contenu, text="Alertes ouvertes", style="Section.TLabel").pack(
-                anchor="w", pady=(0, 4)
+            ligne_alertes = self._rangee([1, 3])
+            carte_alertes, self.tableau_alertes = self._tableau_dans_carte(
+                ligne_alertes,
+                "Alertes ouvertes",
+                "Double-clic pour ouvrir l'alerte",
+                COLONNES_ALERTES,
+                6,
             )
-            self.tableau_alertes = TableauTriable(self.cadre_contenu, COLONNES_ALERTES, hauteur=6)
-            self.tableau_alertes.pack(fill="both", expand=True)
             self.tableau_alertes.sur_double_clic(self._ouvrir_alerte)
-            self._charger_alertes(self.tableau_alertes, site_id)
+            ouvertes = self._charger_alertes(self.tableau_alertes, site_id)
+            parts = [
+                (
+                    "Critiques",
+                    sum(1 for a in ouvertes if a["niveau"] == "rouge"),
+                    COULEURS["rouge"],
+                ),
+                (
+                    "Vigilance",
+                    sum(1 for a in ouvertes if a["niveau"] == "orange"),
+                    COULEURS["orange"],
+                ),
+            ]
+            self._carte_anneau(
+                ligne_alertes, 0, 2, "Alertes par niveau", "", parts, "alertes ouvertes"
+            )
+            self._placer(ligne_alertes, carte_alertes, 1, 2)
 
     def _dessiner_besoin_vs_capacite(self, graphique: GraphiqueIntegre, site_id: int) -> None:
         if not self.voit_les_previsions:
@@ -380,27 +415,24 @@ class VueTableauBord(Vue):
             return
 
         def _dessiner(axe):
-            x = np.arange(len(zones_communes))
-            largeur = 0.35
-            axe.bar(
-                x - largeur / 2,
-                [besoin_par_zone.get(z, 0.0) for z in zones_communes],
-                largeur,
-                label="Besoin prévu",
-                color=COULEURS["primaire"],
+            barres_groupees(
+                axe,
+                zones_communes,
+                [
+                    (
+                        [besoin_par_zone.get(z, 0.0) for z in zones_communes],
+                        COULEURS["primaire"],
+                        "Besoin prévu",
+                    ),
+                    (
+                        [capacite_par_zone.get(z, 0.0) for z in zones_communes],
+                        COULEURS["vert"],
+                        "Capacité",
+                    ),
+                ],
             )
-            axe.bar(
-                x + largeur / 2,
-                [capacite_par_zone.get(z, 0.0) for z in zones_communes],
-                largeur,
-                label="Capacité",
-                color=COULEURS["vert"],
-            )
-            axe.set_xticks(x)
-            axe.set_xticklabels(zones_communes, fontsize=7)
             axe.set_ylabel("Heures")
-            axe.legend(fontsize=7)
-            axe.set_title("Besoin prévu J+1 à J+7 vs capacité", fontsize=9, loc="left")
+            legende_en_haut(axe)
 
         graphique.dessiner(_dessiner)
 
@@ -410,32 +442,16 @@ class VueTableauBord(Vue):
             graphique.afficher_message("Disponibilité non calculée.")
             return
         valeur = max(0.0, min(100.0, trouve["valeur"]))
-        couleur = COULEURS[
-            {"vert": "vert", "orange": "orange", "rouge": "rouge"}.get(trouve["statut"], "gris")
-        ]
-
-        def _dessiner(axe):
-            axe.pie(
-                [valeur, 100 - valeur],
-                colors=[couleur, COULEURS["gris_clair"]],
-                startangle=90,
-                counterclock=False,
-                wedgeprops={"width": 0.35, "edgecolor": COULEURS["surface"]},
+        couleur = COULEURS_STATUT.get(trouve["statut"], COULEURS["gris"])
+        graphique.dessiner(
+            lambda axe: jauge(
+                axe,
+                valeur / 100,
+                couleur,
+                centre=f"{formater_nombre(valeur, 0)} %",
+                sous_centre=LIBELLES_STATUT.get(trouve["statut"], ""),
             )
-            axe.text(
-                0,
-                0,
-                f"{formater_nombre(valeur, 0)} %",
-                ha="center",
-                va="center",
-                fontsize=13,
-                fontweight="bold",
-                color=COULEURS["texte"],
-            )
-            axe.set_title("Disponibilité des équipements", fontsize=9, loc="left")
-            axe.set_aspect("equal")
-
-        graphique.dessiner(_dessiner)
+        )
 
     def _charger_ecarts_veille(
         self, tableau: TableauTriable, site_id: int, zone_id: int | None
@@ -454,7 +470,7 @@ class VueTableauBord(Vue):
             ligne["methode_libelle"] = METHODES_COURTES.get(ligne["methode"], ligne["methode"])
         tableau.charger(lignes, cle_id="prevision_id", message_vide="Aucun écart pour hier.")
 
-    def _charger_alertes(self, tableau: TableauTriable, site_id: int) -> None:
+    def _charger_alertes(self, tableau: TableauTriable, site_id: int) -> list[dict]:
         ouvertes = self.executer(lambda: alertes.lister_alertes_ouvertes(self.ctx, site_id)) or []
         for ligne in ouvertes:
             ligne["type_libelle"] = libelle(TYPES_ALERTE, ligne["type"])
@@ -465,6 +481,7 @@ class VueTableauBord(Vue):
             etiquettes=_etiquette_alerte,
             message_vide="Aucune alerte ouverte.",
         )
+        return ouvertes
 
     def _ouvrir_alerte(self, ligne: dict) -> None:
         self.application.naviguer("alertes", alerte_id=ligne["id"])
@@ -476,26 +493,47 @@ class VueTableauBord(Vue):
         valeurs = self._valeurs_kpi(site_id, zone_id, periodicite)
         self._construire_tuiles(TUILES_RESPONSABLE, valeurs)
 
-        graphiques = ttk.Frame(self.cadre_contenu)
-        graphiques.pack(fill="both", expand=True)
-        graphique_heures = GraphiqueIntegre(graphiques, largeur=7, hauteur=3)
-        graphique_heures.pack(side="left", fill="both", expand=True)
-        self._dessiner_reel_vs_previsions(graphique_heures, site_id)
-
-        cadre_methodes = ttk.Frame(graphiques)
-        cadre_methodes.pack(side="left", fill="y", padx=(12, 0))
-        ttk.Label(cadre_methodes, text="MAPE et biais par méthode", style="Section.TLabel").pack(
-            anchor="w", pady=(0, 6)
+        ligne = self._rangee([3, 2])
+        graphique_heures = self._carte_graphique(
+            ligne,
+            0,
+            2,
+            "Réel contre prévisions",
+            "Heures par semaine : réalisé, régression (RL), réseau (RN)",
         )
-        for code in ("MAPE_H", "BIAIS_H"):
-            for v in [ligne for ligne in valeurs if ligne["kpi_code"] == code]:
-                _construire_tuile(
-                    cadre_methodes,
-                    f"{v['kpi_libelle']} — {METHODES_COURTES.get(v['methode'], v['methode'])}",
-                    _formater_valeur(v["valeur"], v["unite"]),
-                    "",
-                    v["statut"],
-                ).pack(fill="x", pady=(0, 8))
+        self._dessiner_reel_vs_previsions(graphique_heures, site_id)
+        comptes = {"vert": 0, "orange": 0, "rouge": 0, "gris": 0}
+        for v in valeurs:
+            comptes[v["statut"] if v["statut"] in comptes else "gris"] += 1
+        parts = [
+            ("Conformes", comptes["vert"], COULEURS["vert"]),
+            ("Vigilance", comptes["orange"], COULEURS["orange"]),
+            ("Critiques", comptes["rouge"], COULEURS["rouge"]),
+            ("Sans objectif", comptes["gris"], COULEURS["gris"]),
+        ]
+        self._carte_anneau(
+            ligne, 1, 2, "Santé des KPI", "Indicateurs de la période", parts, "indicateurs"
+        )
+
+        precision = [v for code in ("MAPE_H", "BIAIS_H") for v in valeurs if v["kpi_code"] == code]
+        if precision:
+            ligne_precision = self._rangee([1] * len(precision))
+            for colonne, v in enumerate(precision):
+                self._carte_indicateur_precision(ligne_precision, colonne, len(precision), v)
+
+    def _carte_indicateur_precision(
+        self, ligne: ttk.Frame, colonne: int, total: int, v: dict
+    ) -> None:
+        titre = f"{v['kpi_libelle']} — {METHODES_COURTES.get(v['methode'], v['methode'])}"
+        carte = carte_stat(
+            ligne,
+            titre,
+            _formater_valeur(v["valeur"], v["unite"]),
+            "",
+            v["statut"],
+            LIBELLES_STATUT.get(v["statut"], "Non calculé"),
+        )
+        self._placer(ligne, carte, colonne, total)
 
     def _dessiner_reel_vs_previsions(self, graphique: GraphiqueIntegre, site_id: int) -> None:
         if not self.voit_les_previsions:
@@ -534,20 +572,23 @@ class VueTableauBord(Vue):
         ]
 
         def _dessiner(axe):
+            reel = [v["reel"] for _, v in points]
             axe.plot(
                 libelles,
-                [v["reel"] for _, v in points],
+                reel,
                 marker="o",
                 markersize=4,
+                linewidth=2.2,
                 color=COULEURS["primaire"],
                 label="Réalisé",
             )
-            remplissage_degrade(axe, libelles, [v["reel"] for _, v in points], COULEURS["primaire"])
+            remplissage_degrade(axe, libelles, reel, COULEURS["primaire"])
             axe.plot(
                 libelles,
                 [v["regression_lineaire"] for _, v in points],
                 marker="o",
                 markersize=3,
+                linewidth=1.8,
                 color=COULEURS["orange"],
                 label="Prévu (RL)",
             )
@@ -556,12 +597,12 @@ class VueTableauBord(Vue):
                 [v["reseau_neurones"] for _, v in points],
                 marker="o",
                 markersize=3,
+                linewidth=1.8,
                 color=COULEURS["vert"],
                 label="Prévu (RN)",
             )
             axe.set_ylabel("Heures / semaine")
-            axe.legend(fontsize=7, loc="upper left")
-            axe.set_title("Réel vs RL vs RN", fontsize=9, loc="left")
+            legende_en_haut(axe)
 
         graphique.dessiner(_dessiner)
 
@@ -572,12 +613,13 @@ class VueTableauBord(Vue):
         valeurs = self._valeurs_kpi(site_id, zone_id, periodicite)
         self._construire_tuiles(TUILES_DIRECTION, valeurs)
 
-        graphiques = ttk.Frame(self.cadre_contenu)
-        graphiques.pack(fill="both", pady=(0, 12))
-        graphique_tendances = GraphiqueIntegre(graphiques, largeur=7, hauteur=2.8)
-        graphique_tendances.pack(side="left", fill="both", expand=True)
-        graphique_victoire = GraphiqueIntegre(graphiques, largeur=3.2, hauteur=2.8)
-        graphique_victoire.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        ligne = self._rangee([3, 2])
+        graphique_tendances = self._carte_graphique(
+            ligne, 0, 2, "Tendances sur 12 mois", "Adéquation de l'effectif et commandes à temps"
+        )
+        graphique_victoire = self._carte_graphique(
+            ligne, 1, 2, "Taux de victoire", "Régression linéaire contre réseau de neurones", 3.4
+        )
         self._dessiner_tendances_12_mois(graphique_tendances, site_id, zone_id)
         self._dessiner_taux_victoire(graphique_victoire, valeurs)
 
@@ -616,6 +658,7 @@ class VueTableauBord(Vue):
                 serie_adequation,
                 marker="o",
                 markersize=3,
+                linewidth=2.2,
                 color=COULEURS["primaire"],
                 label="Adéquation de l'effectif (%)",
             )
@@ -625,13 +668,13 @@ class VueTableauBord(Vue):
                 _serie(dates, par_a_temps),
                 marker="o",
                 markersize=3,
+                linewidth=1.8,
                 color=COULEURS["orange"],
                 label="Commandes à temps (%)",
             )
             axe.set_ylabel("%")
-            axe.legend(fontsize=7, loc="upper left")
+            legende_en_haut(axe)
             axe.tick_params(axis="x", rotation=30, labelsize=7)
-            axe.set_title("Tendances sur 12 mois", fontsize=9, loc="left")
 
         graphique.dessiner(_dessiner)
 
@@ -646,13 +689,32 @@ class VueTableauBord(Vue):
         def _dessiner(axe):
             methodes = [METHODES_COURTES.get(v["methode"], v["methode"]) for v in lignes]
             valeurs_pct = [v["valeur"] for v in lignes]
-            couleurs = [COULEURS["primaire"], COULEURS["orange"]][: len(lignes)]
-            axe.bar(methodes, valeurs_pct, color=couleurs)
-            axe.set_ylabel("%")
+            couleurs = [COULEURS["primaire"], COULEURS["orange"]]
+            for rang, valeur in enumerate(valeurs_pct):
+                barres_groupees(
+                    axe,
+                    methodes,
+                    [
+                        (
+                            [valeur if i == rang else None for i in range(len(methodes))],
+                            couleurs[rang % 2],
+                            None,
+                        )
+                    ],
+                    largeur_groupe=0.46,
+                )
             axe.set_ylim(0, 100)
-            axe.set_title("Taux de victoire RL vs RN", fontsize=9, loc="left")
+            axe.set_ylabel("%")
             for i, v in enumerate(valeurs_pct):
-                axe.text(i, min(v + 2, 96), f"{formater_nombre(v, 0)} %", ha="center", fontsize=8)
+                axe.text(
+                    i,
+                    min(v + 3, 96),
+                    f"{formater_nombre(v, 0)} %",
+                    ha="center",
+                    fontsize=9,
+                    fontweight="bold",
+                    color=COULEURS["texte"],
+                )
 
         graphique.dessiner(_dessiner)
 
@@ -666,34 +728,32 @@ class VueTableauBord(Vue):
             or []
         )
         utilisables = [v for v in historique if v["valeur"] is not None]
-        cadre = ttk.Frame(self.cadre_contenu, style="Carte.TFrame", padding=12)
-        cadre.pack(fill="x")
-        fond = {"background": COULEURS["surface"]}
-        tk.Label(
-            cadre,
-            text="Progression de l'adéquation depuis la situation de référence",
-            font=("", 9, "bold"),
-            foreground=COULEURS["texte_secondaire"],
-            **fond,
-        ).pack(anchor="w")
+        carte = Carte(
+            self.cadre_contenu,
+            "Progression de l'adéquation",
+            "Depuis la situation de référence",
+        )
+        carte.pack(fill="x")
         if len(utilisables) < 2:
-            tk.Label(cadre, text="Historique mensuel insuffisant.", font=("", 12), **fond).pack(
+            ttk.Label(carte.zone, text="Historique mensuel insuffisant.", style="Aide.TLabel").pack(
                 anchor="w"
             )
             return
         reference, actuelle = utilisables[0], utilisables[-1]
         delta = actuelle["valeur"] - reference["valeur"]
         signe = "+" if delta >= 0 else ""
-        texte = (
-            f"{signe}{formater_nombre(delta, 1)} points depuis "
-            f"{formater_date(reference['date_debut_periode'])} (référence : "
-            f"{formater_nombre(reference['valeur'], 1)} %, actuel : "
-            f"{formater_nombre(actuelle['valeur'], 1)} %)"
-        )
-        tk.Label(
-            cadre,
-            text=texte,
-            font=("", 14, "bold"),
+        ttk.Label(
+            carte.zone,
+            text=f"{signe}{formater_nombre(delta, 1)} points",
+            font=("", 22, "bold"),
             foreground=COULEURS["vert"] if delta >= 0 else COULEURS["rouge"],
-            **fond,
+        ).pack(anchor="w")
+        ttk.Label(
+            carte.zone,
+            text=(
+                f"Depuis le {formater_date(reference['date_debut_periode'])} "
+                f"(référence : {formater_nombre(reference['valeur'], 1)} %, "
+                f"actuel : {formater_nombre(actuelle['valeur'], 1)} %)"
+            ),
+            style="Aide.TLabel",
         ).pack(anchor="w", pady=(2, 0))

@@ -1,4 +1,4 @@
-"""Fenêtre principale : bandeau, menu de navigation par rôle, contenu et barre d'état."""
+"""Fenêtre principale : barre latérale de navigation, en-tête de page, contenu, état du système."""
 
 from __future__ import annotations
 
@@ -6,15 +6,18 @@ import tkinter as tk
 from datetime import date, datetime
 from tkinter import ttk
 
-from app import NOM_APPLICATION, REPERE_TECHNIQUE
+from app import NOM_APPLICATION
 from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
 from app.gui.connexion import EcranConnexion
-from app.gui.degrades import image_degradee
-from app.gui.style import COULEUR_FOND_MARQUE, COULEURS, COULEURS_DEGRADE_MARQUE, appliquer_style
+from app.gui.formes import image_arrondie, photo
+from app.gui.style import COULEURS, appliquer_style, basculer_theme, theme_courant
 from app.gui.vues import ACCUEIL, ecran, ecrans_autorises
+from app.gui.widgets.carte import Carte
 from app.gui.widgets.dialogues import afficher_erreur, franciser_tk
+from app.gui.widgets.entete import BoutonIcone, PuceUtilisateur
+from app.gui.widgets.navigation import LARGEUR_BARRE, BarreNavigation
 from app.journal import journal
 from app.taches.planificateur import Planificateur
 from app.utils.format_fr import formater_date_heure, formater_date_longue
@@ -51,7 +54,7 @@ class Application:
         self.afficher_connexion()
 
     # ------------------------------------------------------------------
-    # Connexion / déconnexion
+    # Connexion / déconnexion / thème
     # ------------------------------------------------------------------
     def _vider(self) -> None:
         if self._minuterie is not None:
@@ -71,29 +74,39 @@ class Application:
         self._cadre = EcranConnexion(self.racine, self.ouvrir_session, self.quitter)
         self._cadre.pack(fill="both", expand=True)
 
-    def ouvrir_session(self, contexte: Contexte) -> None:
+    def ouvrir_session(self, contexte: Contexte, ecran_initial: str | None = None) -> None:
         """Construit l'espace de travail de l'utilisateur connecté."""
         self._vider()
         self.contexte = contexte
-        self._cadre = ttk.Frame(self.racine)
+        self._cadre = ttk.Frame(self.racine, style="Page.TFrame")
         self._cadre.pack(fill="both", expand=True)
-        self._construire_menu_aide()
-        self._construire_bandeau()
-        self._construire_bandeau_demo()
-        self._construire_barre_etat()
-        corps = ttk.Frame(self._cadre)
-        corps.pack(fill="both", expand=True)
-        self._construire_navigation(corps)
-        self.zone_contenu = ttk.Frame(corps)
-        self.zone_contenu.pack(side="left", fill="both", expand=True)
-        self.naviguer(ACCUEIL[contexte.role])
+        self._charger_etat()
+        self._construire_barre_laterale(self._cadre)
+        droite = ttk.Frame(self._cadre, style="Page.TFrame")
+        droite.pack(side="left", fill="both", expand=True)
+        self._construire_entete(droite)
+        self._construire_bandeau_demo(droite)
+        self.zone_contenu = ttk.Frame(droite, style="Page.TFrame")
+        self.zone_contenu.pack(fill="both", expand=True)
+        self.naviguer(ecran_initial or ACCUEIL[contexte.role])
         self.actualiser_compteur_alertes()
         self.actualiser_barre_etat()
 
     def se_deconnecter(self) -> None:
-        """Bouton « Se déconnecter » : retour à l'écran de connexion."""
+        """Retour à l'écran de connexion."""
         _log.info("Déconnexion de « %s ».", self.contexte.identifiant if self.contexte else "?")
         self.afficher_connexion()
+
+    def basculer_theme(self) -> None:
+        """Passe du thème sombre au thème clair (ou l'inverse), puis reconstruit l'espace de
+        travail sur le même écran : les couleurs sont lues à la création des widgets."""
+        ecran_courant, contexte = self.vue_courante, self.contexte
+        basculer_theme()
+        appliquer_style(self.racine)
+        if contexte is None:
+            self.afficher_connexion()
+        else:
+            self.ouvrir_session(contexte, ecran_courant)
 
     def quitter(self) -> None:
         """Ferme l'application (le planificateur de tâches est arrêté proprement)."""
@@ -119,47 +132,7 @@ class Application:
             except tk.TclError:
                 _log.warning("Icône de fenêtre indisponible.")
 
-    def _construire_menu_aide(self) -> None:
-        barre = tk.Menu(self.racine, tearoff=False)
-        aide = tk.Menu(barre, tearoff=False)
-        aide.add_command(label="À propos", command=self.ouvrir_a_propos)
-        barre.add_cascade(label="Aide", menu=aide)
-        self.racine.configure(menu=barre)
-
-    def _construire_bandeau(self) -> None:
-        bandeau = ttk.Frame(self._cadre, style="Bandeau.TFrame", padding=(16, 10))
-        bandeau.pack(fill="x")
-        if not hasattr(self, "_fond_bandeau"):
-            # Largeur proche de l'espace habituellement visible entre le bloc de gauche (logo,
-            # titre) et celui de droite (utilisateur, bouton) : le dégradé complet (5 teintes)
-            # s'y déploie, plutôt que de n'en montrer qu'un fragment sur une image très large.
-            chemin_fond = image_degradee(900, 72, COULEURS_DEGRADE_MARQUE)
-            self._fond_bandeau = tk.PhotoImage(file=str(chemin_fond))
-        tk.Label(
-            bandeau, image=self._fond_bandeau, background=COULEUR_FOND_MARQUE, borderwidth=0
-        ).place(x=0, y=0, relwidth=1, relheight=1, anchor="nw")
-        if not hasattr(self, "_logo_bandeau"):
-            self._logo_bandeau = tk.PhotoImage(
-                file=str(DOSSIER_IMAGES / "logo_workly_88.png")
-            ).subsample(2, 2)
-        ttk.Label(bandeau, image=self._logo_bandeau, background=COULEUR_FOND_MARQUE).pack(
-            side="left", padx=(0, 10)
-        )
-        textes = ttk.Frame(bandeau, style="Bandeau.TFrame")
-        textes.pack(side="left")
-        ttk.Label(textes, text=NOM_APPLICATION, style="BandeauTitre.TLabel").pack(anchor="w")
-        ttk.Label(textes, text=REPERE_TECHNIQUE, style="BandeauRepere.TLabel").pack(anchor="w")
-        ttk.Button(
-            bandeau, text="Se déconnecter", style="Bandeau.TButton", command=self.se_deconnecter
-        ).pack(side="right")
-        ctx = self.contexte
-        ttk.Label(
-            bandeau,
-            text=f"{ctx.nom_complet or ctx.identifiant}  ·  {ctx.libelle_role}",
-            style="Bandeau.TLabel",
-        ).pack(side="right", padx=(0, 16))
-
-    def _construire_bandeau_demo(self) -> None:
+    def _charger_etat(self) -> None:
         try:
             from app.services.admin import etat_application
 
@@ -167,51 +140,154 @@ class Application:
         except ErreurApplication as exc:
             _log.warning("État de l'application indisponible : %s", exc)
             self.etat = {"demonstration": False}
-        if self.etat.get("demonstration"):
-            cadre = ttk.Frame(self._cadre, style="Demo.TFrame", padding=(16, 4))
-            cadre.pack(fill="x")
-            ttk.Label(
-                cadre,
-                style="Demo.TLabel",
-                text="Données de démonstration — ce jeu de données est fictif et sert "
-                "uniquement à rejouer la situation du lundi.",
-            ).pack(side="left")
-            fermer = ttk.Label(cadre, text="✕", style="Demo.TLabel", cursor="hand2")
-            fermer.pack(side="right")
-            fermer.bind("<Button-1>", lambda _evt: cadre.destroy())
 
-    def _construire_navigation(self, parent: ttk.Frame) -> None:
-        cadre = ttk.Frame(parent, style="Navigation.TFrame", width=230)
-        cadre.pack(side="left", fill="y")
-        cadre.pack_propagate(False)
-        self.navigation = ttk.Treeview(
-            cadre, show="tree", selectmode="browse", style="Navigation.Treeview"
+    def _construire_barre_laterale(self, parent: ttk.Frame) -> None:
+        c = COULEURS
+        barre = tk.Frame(parent, background=c["barre"], width=LARGEUR_BARRE)
+        barre.pack(side="left", fill="y")
+        barre.pack_propagate(False)
+        tk.Frame(parent, background=c["bordure"], width=1).pack(side="left", fill="y")
+
+        marque = tk.Frame(barre, background=c["barre"])
+        marque.pack(fill="x", padx=22, pady=(24, 14))
+        logo = photo(
+            barre,
+            ("logo", 44),
+            lambda: image_arrondie(str(DOSSIER_IMAGES / "logo_workly_88.png"), 44, 12),
         )
-        self.navigation.column("#0", width=230)
-        self.navigation.pack(fill="both", expand=True, pady=(8, 0))
-        for element in ecrans_autorises(self.contexte.role):
-            self.navigation.insert("", "end", iid=element.cle, text=f"   {element.libelle}")
-        self.navigation.bind("<<TreeviewSelect>>", self._sur_navigation)
+        tk.Label(marque, image=logo, background=c["barre"], borderwidth=0).pack(side="left")
+        textes = tk.Frame(marque, background=c["barre"])
+        textes.pack(side="left", padx=(12, 0))
+        tk.Label(
+            textes,
+            text=NOM_APPLICATION,
+            background=c["barre"],
+            foreground=c["texte"],
+            font=("", 16, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            textes,
+            text="Planification RH",
+            background=c["barre"],
+            foreground=c["texte_secondaire"],
+            font=("", 9),
+        ).pack(anchor="w")
 
-    def _construire_barre_etat(self) -> None:
-        barre = ttk.Frame(self._cadre, style="Etat.TFrame", padding=(12, 3))
-        barre.pack(side="bottom", fill="x")
-        self.etat_synchro = ttk.Label(barre, text="", style="Etat.TLabel")
-        self.etat_synchro.pack(side="left")
-        self.etat_planificateur = ttk.Label(barre, text="", style="Etat.TLabel")
-        self.etat_planificateur.pack(side="left", padx=(24, 0))
+        elements = [
+            (e.cle, e.libelle, e.cle, e.groupe) for e in ecrans_autorises(self.contexte.role)
+        ]
+        self.navigation = BarreNavigation(barre, elements, self.naviguer)
+        self.navigation.pack(fill="x")
+
+        etat = Carte(
+            barre,
+            couleur=c["surface_2"],
+            fond=c["barre"],
+            bordure=c["surface_2"],
+            marge=14,
+        )
+        etat.pack(side="bottom", fill="x", padx=14, pady=16)
+        ligne = tk.Frame(etat.corps, background=c["surface_2"])
+        ligne.pack(fill="x")
+        self._pastille_etat = tk.Label(
+            ligne, text="●", background=c["surface_2"], foreground=c["gris"], font=("", 10)
+        )
+        self._pastille_etat.pack(side="left")
+        tk.Label(
+            ligne,
+            text="Planificateur de tâches",
+            background=c["surface_2"],
+            foreground=c["texte"],
+            font=("", 9, "bold"),
+            anchor="w",
+        ).pack(side="left", padx=(6, 0))
+        self.etat_planificateur = tk.Label(
+            etat.corps,
+            text="",
+            background=c["surface_2"],
+            foreground=c["texte_secondaire"],
+            font=("", 9),
+            anchor="w",
+        )
+        self.etat_planificateur.pack(fill="x", padx=(20, 0))
+        self.etat_synchro = tk.Label(
+            etat.corps,
+            text="",
+            background=c["surface_2"],
+            foreground=c["texte_secondaire"],
+            font=("", 8),
+            anchor="w",
+            justify="left",
+            wraplength=LARGEUR_BARRE - 84,
+        )
+        self.etat_synchro.pack(fill="x", pady=(6, 0))
+
+    def _construire_entete(self, parent: ttk.Frame) -> None:
+        entete = ttk.Frame(parent, style="Page.TFrame", padding=(28, 22, 28, 4))
+        entete.pack(fill="x")
+        gauche = ttk.Frame(entete, style="Page.TFrame")
+        gauche.pack(side="left")
+        self.titre_page = ttk.Label(gauche, text="", style="PageTitre.TLabel")
+        self.titre_page.pack(anchor="w")
+        self.sous_titre_page = ttk.Label(gauche, text="", style="PageSousTitre.TLabel")
+        self.sous_titre_page.pack(anchor="w")
+
+        ctx = self.contexte
+        droite = ttk.Frame(entete, style="Page.TFrame")
+        droite.pack(side="right")
         ttk.Label(
-            barre, text=formater_date_longue(date.today()).capitalize(), style="Etat.TLabel"
-        ).pack(side="right")
+            droite, text=formater_date_longue(date.today()).capitalize(), style="PageAide.TLabel"
+        ).pack(side="left", padx=(0, 18))
+        sombre = theme_courant() == "sombre"
+        self.bouton_theme = BoutonIcone(
+            droite,
+            "soleil" if sombre else "lune",
+            self.basculer_theme,
+            "Passer au thème clair" if sombre else "Passer au thème sombre",
+        )
+        self.bouton_theme.pack(side="left", padx=(0, 16))
+        PuceUtilisateur(
+            droite,
+            ctx.nom_complet or ctx.identifiant,
+            ctx.libelle_role,
+            [
+                ("À propos de Workly", self.ouvrir_a_propos),
+                ("Changer de thème", self.basculer_theme),
+                None,
+                ("Se déconnecter", self.se_deconnecter),
+            ],
+        ).pack(side="left")
+
+    def _construire_bandeau_demo(self, parent: ttk.Frame) -> None:
+        if not self.etat.get("demonstration"):
+            return
+        c = COULEURS
+        conteneur = ttk.Frame(parent, style="Page.TFrame", padding=(28, 8, 28, 0))
+        conteneur.pack(fill="x")
+        carte = Carte(conteneur, marge=12, couleur=c["demo"], bordure=c["demo"], sur="page")
+        carte.pack(fill="x")
+        tk.Label(
+            carte.corps,
+            text="Données de démonstration — ce jeu de données est fictif et sert "
+            "uniquement à rejouer la situation du lundi.",
+            background=c["demo"],
+            foreground=c["demo_texte"],
+            font=("", 10, "bold"),
+            anchor="w",
+        ).pack(side="left")
+        fermer = tk.Label(
+            carte.corps,
+            text="✕",
+            background=c["demo"],
+            foreground=c["demo_texte"],
+            cursor="hand2",
+        )
+        fermer.pack(side="right")
+        fermer.bind("<Button-1>", lambda _evt: conteneur.destroy())
 
     # ------------------------------------------------------------------
     # Navigation
     # ------------------------------------------------------------------
-    def _sur_navigation(self, _evenement=None) -> None:
-        selection = self.navigation.selection()
-        if selection and selection[0] != self.vue_courante:
-            self.naviguer(selection[0])
-
     def naviguer(self, cle: str, **parametres) -> None:
         """Affiche l'écran ``cle`` (créé à la première ouverture)."""
         definition = ecran(cle)
@@ -230,6 +306,8 @@ class Application:
             self.vues[cle] = vue
         vue.pack(fill="both", expand=True)
         self.vue_courante = cle
+        self.titre_page.configure(text=vue.titre)
+        self.sous_titre_page.configure(text=vue.sous_titre)
         if tuple(self.navigation.selection()) != (cle,):
             self.navigation.selection_set(cle)
         if parametres:
@@ -240,19 +318,17 @@ class Application:
             afficher_erreur(self.racine, exc.message)
 
     # ------------------------------------------------------------------
-    # Compteur d'alertes et barre d'état
+    # Compteur d'alertes et état du système
     # ------------------------------------------------------------------
     def actualiser_compteur_alertes(self) -> None:
-        """Met à jour « Alertes (n) » dans le menu, puis se reprogramme."""
+        """Met à jour le compteur de l'entrée « Alertes », puis se reprogramme."""
         if self.contexte is None:
             return
         if self.navigation.exists("alertes"):
             try:
                 from app.services.alertes import compter_alertes_ouvertes
 
-                nombre = compter_alertes_ouvertes(self.contexte)
-                texte = "   Alertes" + (f"  ({nombre})" if nombre else "")
-                self.navigation.item("alertes", text=texte)
+                self.navigation.definir_badge("alertes", compter_alertes_ouvertes(self.contexte))
             except ErreurApplication as exc:
                 _log.warning("Compteur d'alertes indisponible : %s", exc)
         self._minuterie = self.racine.after(
@@ -275,15 +351,18 @@ class Application:
         self.etat_synchro.configure(text=f"Dernière synchronisation : {synchro}")
         actif = self.planificateur is not None and self.planificateur.est_actif
         self.etat_planificateur.configure(
-            text=f"Planificateur de tâches : {'en marche' if actif else 'arrêté'}",
+            text="En marche" if actif else "Arrêté",
             foreground=COULEURS["vert"] if actif else COULEURS["texte_secondaire"],
+        )
+        self._pastille_etat.configure(
+            foreground=COULEURS["vert"] if actif else COULEURS["texte_secondaire"]
         )
 
     # ------------------------------------------------------------------
     # Divers
     # ------------------------------------------------------------------
     def ouvrir_a_propos(self) -> None:
-        """Écran 12 — À propos (menu « Aide »)."""
+        """Écran 12 — À propos (menu de l'utilisateur)."""
         from app.gui.vues.a_propos import FenetreAPropos
 
         FenetreAPropos(self.racine).afficher()

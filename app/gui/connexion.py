@@ -62,7 +62,7 @@ class EcranConnexion(ttk.Frame):
         self.message.grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 0))
         boutons = ttk.Frame(carte, style="Marque.TFrame")
         boutons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(16, 0))
-        self.bouton_quitter = ttk.Button(boutons, text="Quitter", command=sur_quitter)
+        self.bouton_quitter = Bouton(boutons, "Quitter", sur_quitter, sur_marque=True)
         self.bouton_quitter.pack(side="right")
         self.bouton_connexion = Bouton(boutons, "Se connecter", self.se_connecter, primaire=True)
         self.bouton_connexion.pack(side="right", padx=(0, 8))

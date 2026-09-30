@@ -1,11 +1,11 @@
-"""Boutons de l'application.
+"""Boutons de l'application, en pilule.
 
-``Bouton`` est le point d'entrée unique : ``primaire=False`` construit un ``ttk.Button``
-standard, ``primaire=True`` construit plutôt un :class:`BoutonPrimaire` en dégradé de
-marque (la référence visuelle demande des boutons principaux en dégradé, avec un léger
-« glow » au survol). Les deux exposent la même API (:meth:`activer`, :attr:`est_actif`,
-info-bulle qui explique pourquoi un bouton est grisé), pour que le reste du code n'ait pas
-à savoir lequel il manipule.
+``Bouton`` est le point d'entrée unique : ``primaire=True`` construit un :class:`BoutonPrimaire`
+(dégradé de marque), sinon un :class:`BoutonSecondaire` (contour discret). Les deux sont des
+``Canvas`` (Tk ne sait pas arrondir un ``ttk.Button``) qui exposent la même API qu'un bouton
+ttk pour le reste du code : :meth:`activer`, :attr:`est_actif`, ``state``/``instate``,
+``cget("text")``/``configure(text=...)``, ``invoke``, plus une info-bulle qui explique pourquoi un
+bouton est grisé. Ils prennent le focus au clavier (Tab) et se déclenchent avec Espace ou Entrée.
 """
 
 from __future__ import annotations
@@ -15,59 +15,36 @@ from collections.abc import Callable
 from tkinter import font as tkfont
 from tkinter import ttk
 
-from app.gui.degrades import eclaircir, image_degradee
-from app.gui.style import COULEURS, COULEURS_DEGRADE_MARQUE
+from app.gui.degrades import eclaircir, melanger
+from app.gui.formes import photo, rectangle_arrondi
+from app.gui.icones import icone_interface
+from app.gui.style import (
+    COULEUR_ACCENT_2,
+    COULEUR_ACCENT_3,
+    COULEUR_ACCENT_4,
+    COULEUR_ACCENT_5,
+    COULEURS,
+)
 from app.gui.widgets.infobulle import InfoBulle
 
-HAUTEUR_PRIMAIRE = 32
+HAUTEUR_BOUTON = 38
+MARGE_HORIZONTALE = 22
+DEGRADE_BOUTON = (COULEUR_ACCENT_2, COULEUR_ACCENT_3, COULEUR_ACCENT_4, COULEUR_ACCENT_5)
 
 
-class Bouton(ttk.Button):
-    """``ttk.Button`` (bouton secondaire) avec :meth:`activer` et info-bulle explicative
-    quand il est grisé."""
-
-    def __new__(
-        cls,
-        parent,
-        texte: str,
-        commande: Callable[[], None],
-        aide: str = "",
-        primaire: bool = False,
-        **options,
-    ):
-        if primaire:
-            return BoutonPrimaire(parent, texte, commande, aide, **options)
-        return super().__new__(cls)
-
-    def __init__(
-        self,
-        parent,
-        texte: str,
-        commande: Callable[[], None],
-        aide: str = "",
-        primaire: bool = False,
-        **options,
-    ) -> None:
-        super().__init__(parent, text=texte, command=commande, **options)
-        self._aide = aide
-        self._infobulle = InfoBulle(self, aide)
-        self.raison = ""
-
-    def activer(self, actif: bool, raison: str = "") -> None:
-        """Active le bouton, ou le grise en affichant ``raison`` au survol."""
-        self.state(["!disabled"] if actif else ["disabled"])
-        self.raison = "" if actif else raison
-        self._infobulle.definir(self._aide if actif else raison)
-
-    @property
-    def est_actif(self) -> bool:
-        return not self.instate(["disabled"])
+def couleur_fond(widget: tk.Misc) -> str:
+    """Couleur de fond réellement peinte derrière ``widget`` (widget Tk, ou cadre/étiquette ttk
+    dont on lit le style)."""
+    try:
+        return str(widget.cget("background"))
+    except tk.TclError:
+        style = ttk.Style(widget)
+        nom = str(widget.cget("style")) or widget.winfo_class()
+        return style.lookup(nom, "background") or COULEURS["surface"]
 
 
-class BoutonPrimaire(tk.Canvas):
-    """Bouton principal en dégradé de marque (5 accents), avec un léger éclaircissement au
-    survol et un état grisé — équivalent statique (ttk ne peint qu'une couleur unie par
-    widget) du bouton « en dégradé, mis en avant » de la référence visuelle."""
+class _BoutonPilule(tk.Canvas):
+    """Logique commune : dessin en pilule, survol, appui, focus clavier, état grisé."""
 
     def __init__(
         self,
@@ -75,86 +52,122 @@ class BoutonPrimaire(tk.Canvas):
         texte: str,
         commande: Callable[[], None],
         aide: str = "",
+        icone: str | None = None,
+        sur_marque: bool = False,
         **_options,
     ) -> None:
+        self._sur_marque = sur_marque
         self._commande = commande
         self._texte = texte
-        self._police = tkfont.nametofont("TkDefaultFont")
-        largeur = self._police.measure(texte) + 44
-        super().__init__(
-            parent,
-            width=largeur,
-            height=HAUTEUR_PRIMAIRE,
-            highlightthickness=0,
-            borderwidth=0,
-            background=COULEURS["fond"],
-            cursor="hand2",
-        )
-        self._largeur = largeur
+        self._icone = icone
         self._actif = True
         self._survole = False
+        self._enfonce = False
+        self._a_le_focus = False
         self._aide = aide
-        self._infobulle = InfoBulle(self, aide)
         self.raison = ""
-        self._images: dict[str, tk.PhotoImage] = {}
+        super().__init__(
+            parent,
+            height=HAUTEUR_BOUTON,
+            highlightthickness=0,
+            borderwidth=0,
+            background=couleur_fond(parent),
+            cursor="hand2",
+            takefocus=True,
+        )
+        self._police = tkfont.Font(root=self, font=tkfont.nametofont("TkDefaultFont"))
+        self._police.configure(weight="bold")
+        self._infobulle = InfoBulle(self, aide)
+        self._mesurer()
         self._dessiner()
-        self.bind("<Enter>", self._survol_entrer)
-        self.bind("<Leave>", self._survol_sortir)
-        self.bind("<ButtonRelease-1>", self._clic)
+        self.bind("<Enter>", self._entrer)
+        self.bind("<Leave>", self._sortir)
+        self.bind("<ButtonPress-1>", self._appuyer)
+        self.bind("<ButtonRelease-1>", self._relacher)
+        self.bind("<FocusIn>", lambda _e: self._changer_focus(True))
+        self.bind("<FocusOut>", lambda _e: self._changer_focus(False))
+        for touche in ("<space>", "<Return>", "<KP_Enter>"):
+            self.bind(touche, lambda _e: self.invoke())
 
-    # --- Rendu --------------------------------------------------------------
-    def _image_degradee(self, cle: str, couleurs: list[str]) -> tk.PhotoImage:
-        if cle not in self._images:
-            chemin = image_degradee(self._largeur, HAUTEUR_PRIMAIRE, couleurs)
-            self._images[cle] = tk.PhotoImage(file=str(chemin))
-        return self._images[cle]
+    # --- Rendu ------------------------------------------------------------
+    def _mesurer(self) -> None:
+        largeur = self._police.measure(self._texte) + 2 * MARGE_HORIZONTALE
+        if self._icone:
+            largeur += 24
+        self._largeur = max(largeur, 84)
+        self.configure(width=self._largeur)
+
+    def _image_fond(self):  # pragma: no cover - redéfinie
+        raise NotImplementedError
+
+    def _couleurs_texte(self) -> tuple[str, str]:  # pragma: no cover - redéfinie
+        """(couleur du texte actif, couleur de l'icône)."""
+        raise NotImplementedError
 
     def _dessiner(self) -> None:
         self.delete("all")
-        if not self._actif:
-            self.create_rectangle(
-                0, 0, self._largeur, HAUTEUR_PRIMAIRE, fill=COULEURS["gris_clair"], width=0
+        image = self._image_fond()
+        self.create_image(0, 0, anchor="nw", image=image)
+        couleur = COULEURS["desactive"] if not self._actif else self._couleurs_texte()[0]
+        decalage = 1 if self._enfonce and self._actif else 0
+        x = self._largeur / 2 + decalage
+        if self._icone:
+            icone = photo(
+                self,
+                ("bouton-icone", self._icone, couleur),
+                lambda: icone_interface(self._icone, couleur, 16),
             )
-            couleur_texte = COULEURS["desactive"]
-        else:
-            if self._survole:
-                couleurs = [eclaircir(c, 0.15) for c in COULEURS_DEGRADE_MARQUE]
-                image = self._image_degradee("survol", couleurs)
-            else:
-                image = self._image_degradee("normal", COULEURS_DEGRADE_MARQUE)
-            self.create_image(0, 0, anchor="nw", image=image)
-            couleur_texte = "#ffffff"
+            largeur_texte = self._police.measure(self._texte)
+            debut = self._largeur / 2 - (largeur_texte + 24) / 2 + decalage
+            self.create_image(debut + 8, HAUTEUR_BOUTON / 2 + decalage, image=icone)
+            x = debut + 24 + largeur_texte / 2
         self.create_text(
-            self._largeur / 2,
-            HAUTEUR_PRIMAIRE / 2,
+            x,
+            HAUTEUR_BOUTON / 2 + decalage,
             text=self._texte,
-            fill=couleur_texte,
+            fill=couleur,
             font=self._police,
         )
 
-    # --- Interactions ---------------------------------------------------------
-    def _survol_entrer(self, _evenement=None) -> None:
-        if not self._actif:
-            return
-        self._survole = True
-        self._dessiner()
+    # --- Interactions -----------------------------------------------------
+    def _entrer(self, _evenement=None) -> None:
+        if self._actif:
+            self._survole = True
+            self._dessiner()
 
-    def _survol_sortir(self, _evenement=None) -> None:
+    def _sortir(self, _evenement=None) -> None:
         self._survole = False
+        self._enfonce = False
         self._dessiner()
 
-    def _clic(self, evenement=None) -> None:
-        if not self._actif:
-            return
-        # Un clic qui commence puis quitte le bouton avant relâchement ne doit pas déclencher
-        # l'action (même comportement qu'un ttk.Button).
+    def _appuyer(self, _evenement=None) -> None:
+        if self._actif:
+            self._enfonce = True
+            self._dessiner()
+
+    def _relacher(self, evenement=None) -> None:
+        etait_enfonce = self._enfonce
+        self._enfonce = False
+        self._dessiner()
+        # Un clic qui commence puis quitte le bouton avant relâchement ne déclenche rien
+        # (même comportement qu'un ttk.Button).
         if evenement is not None and not (
-            0 <= evenement.x <= self._largeur and 0 <= evenement.y <= HAUTEUR_PRIMAIRE
+            0 <= evenement.x <= self._largeur and 0 <= evenement.y <= HAUTEUR_BOUTON
         ):
             return
-        self._commande()
+        if etait_enfonce:
+            self.invoke()
 
-    # --- API compatible avec Bouton / ttk.Button -----------------------------
+    def _changer_focus(self, focus: bool) -> None:
+        self._a_le_focus = focus
+        self._dessiner()
+
+    def invoke(self) -> None:
+        """Déclenche l'action du bouton (sans effet s'il est grisé)."""
+        if self._actif:
+            self._commande()
+
+    # --- API compatible avec ttk.Button ----------------------------------------
     def cget(self, key):
         """Compatibilité : ``cget("text")`` renvoie le libellé du bouton."""
         if key == "text":
@@ -166,9 +179,7 @@ class BoutonPrimaire(tk.Canvas):
         fusion = dict(cnf or {}, **kwargs)
         if "text" in fusion:
             self._texte = fusion.pop("text")
-            self._largeur = self._police.measure(self._texte) + 44
-            self._images.clear()
-            super().configure(width=self._largeur)
+            self._mesurer()
             self._dessiner()
         if fusion:
             super().configure(**fusion)
@@ -179,9 +190,10 @@ class BoutonPrimaire(tk.Canvas):
         """Active le bouton, ou le grise en affichant ``raison`` au survol."""
         self._actif = actif
         self._survole = False
+        self._enfonce = False
         self.raison = "" if actif else raison
         self._infobulle.definir(self._aide if actif else raison)
-        self.configure(cursor="hand2" if actif else "arrow")
+        super().configure(cursor="hand2" if actif else "arrow", takefocus=actif)
         self._dessiner()
 
     @property
@@ -199,3 +211,103 @@ class BoutonPrimaire(tk.Canvas):
         if "disabled" in drapeaux:
             return not self._actif
         return self._actif
+
+
+class BoutonPrimaire(_BoutonPilule):
+    """Bouton principal : pilule en dégradé de marque, plus claire au survol."""
+
+    def _image_fond(self):
+        c = COULEURS
+        if not self._actif:
+            fabrique = lambda: rectangle_arrondi(  # noqa: E731
+                self._largeur, HAUTEUR_BOUTON, HAUTEUR_BOUTON / 2, (c["surface_2"],)
+            )
+            cle = ("pilule-inactive", self._largeur, c["surface_2"])
+        else:
+            couleurs = DEGRADE_BOUTON
+            if self._enfonce:
+                couleurs = tuple(melanger(x, "#000000", 0.18) for x in couleurs)
+            elif self._survole:
+                couleurs = tuple(eclaircir(x, 0.16) for x in couleurs)
+            bordure = c["primaire_clair"] if self._a_le_focus else None
+            fabrique = lambda: rectangle_arrondi(  # noqa: E731
+                self._largeur,
+                HAUTEUR_BOUTON,
+                HAUTEUR_BOUTON / 2,
+                couleurs,
+                0.0,
+                bordure,
+                2.0,
+            )
+            cle = ("pilule-primaire", self._largeur, couleurs, bordure)
+        return photo(self, cle, fabrique)
+
+    def _couleurs_texte(self) -> tuple[str, str]:
+        return "#FFFFFF", "#FFFFFF"
+
+
+#: Couleurs d'un bouton secondaire posé sur un fond de marque (toujours navy, quel que soit le
+#: thème) : écran de connexion.
+_SUR_MARQUE = {
+    "surface_2": "#16204A",
+    "selection": "#1E2A5E",
+    "accent": COULEUR_ACCENT_2,
+    "champ_bordure": "#3A4680",
+    "texte": "#FFFFFF",
+    "desactive": "#6B76A8",
+}
+
+
+class BoutonSecondaire(_BoutonPilule):
+    """Bouton secondaire : pilule à contour discret, fond de la carte, teinte au survol."""
+
+    def _palette(self):
+        return _SUR_MARQUE if self._sur_marque else COULEURS
+
+    def _image_fond(self):
+        c = self._palette()
+        fond = couleur_fond(self.master)
+        if not self._actif:
+            remplissage, bordure = c["surface_2"], None
+        elif self._enfonce:
+            remplissage, bordure = c["selection"], c["accent"]
+        elif self._survole:
+            remplissage, bordure = c["surface_2"], c["accent"]
+        else:
+            remplissage = fond
+            bordure = c["accent"] if self._a_le_focus else c["champ_bordure"]
+        cle = ("pilule-secondaire", self._largeur, remplissage, bordure)
+        return photo(
+            self,
+            cle,
+            lambda: rectangle_arrondi(
+                self._largeur,
+                HAUTEUR_BOUTON,
+                HAUTEUR_BOUTON / 2,
+                (remplissage,),
+                0.0,
+                bordure,
+                1.5 if self._a_le_focus else 1.0,
+            ),
+        )
+
+    def _couleurs_texte(self) -> tuple[str, str]:
+        texte = self._palette()["texte"]
+        return texte, texte
+
+
+class Bouton:
+    """Point d'entrée : ``Bouton(parent, texte, commande, aide, primaire)`` construit, selon
+    ``primaire``, un :class:`BoutonPrimaire` ou un :class:`BoutonSecondaire`."""
+
+    def __new__(
+        cls,
+        parent,
+        texte: str,
+        commande: Callable[[], None],
+        aide: str = "",
+        primaire: bool = False,
+        **options,
+    ):
+        classe = BoutonPrimaire if primaire else BoutonSecondaire
+        return classe(parent, texte, commande, aide, **options)

@@ -12,8 +12,9 @@ from app.gui.widgets.dialogues import executer_action
 class Vue(ttk.Frame):
     """Écran affiché dans la zone de contenu de la fenêtre principale.
 
-    Le contenu (``self.contenu``) défile verticalement sans limite : les écrans dont les
-    éléments dépassent la hauteur visible restent entièrement accessibles à la molette ou
+    Le titre et le sous-titre (attributs de classe) sont affichés par l'en-tête de la fenêtre
+    principale. Le contenu (``self.contenu``) défile verticalement sans limite : les écrans dont
+    les éléments dépassent la hauteur visible restent entièrement accessibles à la molette ou
     à l'ascenseur, plutôt que d'être comprimés ou coupés.
     """
 
@@ -21,27 +22,19 @@ class Vue(ttk.Frame):
     sous_titre = ""
 
     def __init__(self, parent, application) -> None:
-        super().__init__(parent, padding=(18, 14))
+        super().__init__(parent, padding=(28, 10, 14, 10), style="Page.TFrame")
         self.application = application
         self.ctx = application.contexte
-        entete = ttk.Frame(self)
-        entete.pack(fill="x", pady=(0, 10))
-        ttk.Label(entete, text=self.titre, style="Titre.TLabel").pack(side="left")
-        if self.sous_titre:
-            ttk.Label(entete, text=self.sous_titre, style="Aide.TLabel").pack(
-                side="left", padx=(12, 0), pady=(6, 0)
-            )
-        self.entete = entete
 
-        cadre_defilant = ttk.Frame(self)
+        cadre_defilant = ttk.Frame(self, style="Page.TFrame")
         cadre_defilant.pack(fill="both", expand=True)
         canevas = tk.Canvas(cadre_defilant, highlightthickness=0, background=COULEURS["fond"])
         ascenseur = ttk.Scrollbar(cadre_defilant, orient="vertical", command=canevas.yview)
         canevas.configure(yscrollcommand=ascenseur.set)
         ascenseur.pack(side="right", fill="y")
-        canevas.pack(side="left", fill="both", expand=True)
+        canevas.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
-        self.contenu = ttk.Frame(canevas)
+        self.contenu = ttk.Frame(canevas, style="Page.TFrame")
         fenetre = canevas.create_window((0, 0), window=self.contenu, anchor="nw")
 
         def _region_a_jour(_evenement=None) -> None:

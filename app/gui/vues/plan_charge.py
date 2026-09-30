@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from tkinter import ttk
 
 from app.erreurs import ConflitMiseAJour, DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS, PUCE_STATUT
+from app.gui.style import COULEURS, PUCE_STATUT, a_chaque_theme
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe, ChampNombre
@@ -26,11 +26,18 @@ from app.services.planification import STATUTS_MODIFIABLES
 from app.utils.dates import jours_semaine, lundi_de
 from app.utils.format_fr import formater_date, formater_jour_court, formater_nombre
 
-COULEUR_CASE = {
-    "rouge": COULEURS["rouge_clair"],
-    "orange": COULEURS["orange_clair"],
-    None: "#ffffff",
-}
+COULEUR_CASE: dict[str | None, str] = {}
+
+
+@a_chaque_theme
+def _couleurs_cases() -> None:
+    COULEUR_CASE.update(
+        {
+            "rouge": COULEURS["rouge_clair"],
+            "orange": COULEURS["orange_clair"],
+            None: COULEURS["surface"],
+        }
+    )
 
 
 class VuePlanCharge(Vue):

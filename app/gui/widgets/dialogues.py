@@ -12,20 +12,27 @@ from pathlib import Path
 from tkinter import filedialog, ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS
-from app.gui.widgets.bouton import BoutonPrimaire
+from app.gui.style import COULEURS, a_chaque_theme
+from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import appliquer_erreurs
 from app.journal import journal
 
 _log = journal(__name__)
 
 ICONES = {"information": "ℹ", "question": "?", "erreur": "✖", "avertissement": "⚠"}
-COULEURS_ICONES = {
-    "information": COULEURS["primaire"],
-    "question": COULEURS["primaire"],
-    "erreur": COULEURS["rouge"],
-    "avertissement": COULEURS["orange"],
-}
+COULEURS_ICONES: dict[str, str] = {}
+
+
+@a_chaque_theme
+def _couleurs_icones() -> None:
+    COULEURS_ICONES.update(
+        {
+            "information": COULEURS["primaire"],
+            "question": COULEURS["primaire"],
+            "erreur": COULEURS["rouge"],
+            "avertissement": COULEURS["orange"],
+        }
+    )
 
 
 class DialogueBase(tk.Toplevel):
@@ -35,7 +42,7 @@ class DialogueBase(tk.Toplevel):
         super().__init__(parent)
         self.withdraw()
         self.title(titre)
-        self.configure(background=COULEURS["fond"])
+        self.configure(background=COULEURS["surface"])
         self.resizable(redimensionnable, redimensionnable)
         maitre = parent.winfo_toplevel()
         self.transient(maitre)
@@ -50,10 +57,7 @@ class DialogueBase(tk.Toplevel):
     def ajouter_bouton(
         self, texte: str, commande: Callable[[], None], primaire: bool = False, defaut: bool = False
     ) -> ttk.Button:
-        if primaire:
-            bouton = BoutonPrimaire(self.barre_boutons, texte, commande)
-        else:
-            bouton = ttk.Button(self.barre_boutons, text=texte, command=commande)
+        bouton = Bouton(self.barre_boutons, texte, commande, primaire=primaire)
         bouton.pack(side="right", padx=(8, 0))
         if defaut:
             self.bind("<Return>", lambda _e: commande())

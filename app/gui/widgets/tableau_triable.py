@@ -8,14 +8,33 @@ from datetime import date, datetime
 from tkinter import ttk
 
 from app.gui.degrades import melanger
-from app.gui.style import COULEURS, COULEURS_STATUT, COULEURS_STATUT_CLAIR
+from app.gui.style import COULEURS, COULEURS_STATUT, COULEURS_STATUT_CLAIR, a_chaque_theme
 from app.utils.format_fr import formater_date, formater_date_heure, formater_nombre
 
 #: Étape de pulsation (toutes les ~800 ms) des lignes taguées « rouge » (alertes ouvertes
 #: critiques) : un ton médian entre le fond pâle habituel et le rouge plein, pour une pulsation
 #: perceptible mais douce, jamais agressive.
-_ROUGE_PULSATION = melanger(COULEURS_STATUT_CLAIR["rouge"], COULEURS_STATUT["rouge"], 0.25)
+_ROUGE_PULSATION: list[str] = [""]
 _DELAI_PULSATION_MS = 800
+
+#: Étiquettes de ligne : le fond pâle donne la lecture d'ensemble ; le texte (donc la puce « ● »
+#: ajoutée devant le statut par les écrans appelants) reprend la couleur pleine du statut, un
+#: Treeview ne sachant colorer qu'un seul aplat de texte par ligne (pas de couleur par caractère).
+ETIQUETTES: dict[str, dict] = {}
+
+
+@a_chaque_theme
+def _etiquettes_du_theme() -> None:
+    _ROUGE_PULSATION[0] = melanger(COULEURS_STATUT_CLAIR["rouge"], COULEURS_STATUT["rouge"], 0.25)
+    ETIQUETTES.clear()
+    for statut in ("rouge", "orange", "vert"):
+        ETIQUETTES[statut] = {
+            "background": COULEURS_STATUT_CLAIR[statut],
+            "foreground": COULEURS_STATUT[statut],
+        }
+    ETIQUETTES["gris"] = {"foreground": COULEURS["gris"]}
+    ETIQUETTES["inactif"] = {"foreground": COULEURS["desactive"]}
+    ETIQUETTES["gras"] = {"font": ("", 10, "bold")}
 
 
 @dataclass
@@ -74,26 +93,7 @@ class TableauTriable(ttk.Frame):
     pour afficher une arborescence (sites → zones).
     """
 
-    #: Le fond pâle donne la lecture d'ensemble ; le texte (donc la puce « ● » ajoutée devant
-    #: le statut par les écrans appelants) reprend la couleur pleine du statut, un Treeview ne
-    #: sachant colorer qu'un seul aplat de texte par ligne (pas de couleur par caractère).
-    ETIQUETTES = {
-        "rouge": {
-            "background": COULEURS_STATUT_CLAIR["rouge"],
-            "foreground": COULEURS_STATUT["rouge"],
-        },
-        "orange": {
-            "background": COULEURS_STATUT_CLAIR["orange"],
-            "foreground": COULEURS_STATUT["orange"],
-        },
-        "vert": {
-            "background": COULEURS_STATUT_CLAIR["vert"],
-            "foreground": COULEURS_STATUT["vert"],
-        },
-        "gris": {"foreground": COULEURS["gris"]},
-        "inactif": {"foreground": COULEURS["desactive"]},
-        "gras": {"font": ("", 10, "bold")},
-    }
+    ETIQUETTES = ETIQUETTES
 
     def __init__(
         self,
@@ -135,7 +135,10 @@ class TableauTriable(ttk.Frame):
             self.arbre.tag_configure(nom, **options)
         defil_v = ttk.Scrollbar(self, orient="vertical", command=self.arbre.yview)
         defil_h = ttk.Scrollbar(self, orient="horizontal", command=self.arbre.xview)
-        self.arbre.configure(yscrollcommand=defil_v.set, xscrollcommand=defil_h.set)
+        self.arbre.configure(
+            yscrollcommand=self._defilement_auto(defil_v, "ns", 0, 1),
+            xscrollcommand=self._defilement_auto(defil_h, "ew", 1, 0),
+        )
         self.arbre.grid(row=0, column=0, sticky="nsew")
         defil_v.grid(row=0, column=1, sticky="ns")
         defil_h.grid(row=1, column=0, sticky="ew")
@@ -147,6 +150,19 @@ class TableauTriable(ttk.Frame):
         self.bind("<Destroy>", self._arreter_pulsation, add="+")
         self._pulser()
 
+    @staticmethod
+    def _defilement_auto(barre: ttk.Scrollbar, cote: str, ligne: int, colonne: int):
+        """Commande de défilement qui masque la barre tant que tout le contenu est visible."""
+
+        def _commande(debut: str, fin: str) -> None:
+            barre.set(debut, fin)
+            if float(debut) <= 0.0 and float(fin) >= 1.0:
+                barre.grid_remove()
+            else:
+                barre.grid(row=ligne, column=colonne, sticky=cote)
+
+        return _commande
+
     # --- Pulsation des alertes rouges ---------------------------------------
     def _pulser(self) -> None:
         """Fait alterner doucement, toutes les ~800 ms, le fond des lignes taguées « rouge »
@@ -155,7 +171,7 @@ class TableauTriable(ttk.Frame):
         if not self.arbre.winfo_exists():
             return
         self._pulsation_allumee = not self._pulsation_allumee
-        couleur = _ROUGE_PULSATION if self._pulsation_allumee else COULEURS_STATUT_CLAIR["rouge"]
+        couleur = _ROUGE_PULSATION[0] if self._pulsation_allumee else COULEURS_STATUT_CLAIR["rouge"]
         self.arbre.tag_configure("rouge", background=couleur)
         self._id_pulsation = self.after(_DELAI_PULSATION_MS, self._pulser)
 
