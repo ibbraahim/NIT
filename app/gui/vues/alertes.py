@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from tkinter import ttk
-
 from app.erreurs import DonneesInvalides, ErreurApplication
 from app.gui.style import PUCE_STATUT
 from app.gui.vues.base import Vue
@@ -25,15 +23,15 @@ OPTION_TOUS_TYPES = (None, "Tous les types")
 OPTIONS_TYPE = [OPTION_TOUS_TYPES] + list(TYPES_ALERTE.items())
 
 COLONNES_TABLEAU = [
-    Colonne("type_libelle", "Type", 170),
-    Colonne("niveau_libelle", "Niveau", 80, "center"),
-    Colonne("site", "Site", 130),
-    Colonne("zone", "Zone", 110),
-    Colonne("date_concernee", "Date concernée", 110, "center"),
+    Colonne("type_libelle", "Type", 160),
+    Colonne("niveau_libelle", "Niveau", 90, "center"),
+    Colonne("site", "Site", 160),
+    Colonne("zone", "Zone", 100),
+    Colonne("date_concernee", "Date concernée", 120, "center"),
     Colonne("message", "Message", 340),
-    Colonne("statut_libelle", "Statut", 90, "center"),
-    Colonne("date_maj", "Dernière mise à jour", 150, "center", formateur=formater_date_heure),
-    Colonne("suggestion", "Action suggérée", 320),
+    Colonne("statut_libelle", "Statut", 80, "center"),
+    Colonne("date_maj", "Dernière mise à jour", 160, "center", formateur=formater_date_heure),
+    Colonne("suggestion", "Action suggérée", 300),
 ]
 
 
@@ -55,8 +53,7 @@ class VueAlertes(Vue):
         self.peut_traiter = a_le_droit(self.ctx, "UC19")
         self._alerte_a_selectionner: int | None = None
 
-        barre = ttk.Frame(self.contenu)
-        barre.pack(fill="x", pady=(0, 10))
+        barre = self.barre_filtres()
         self.statut = ChampListe(barre, "Statut", options=OPTIONS_STATUT, largeur=16)
         self.statut.pack(side="left")
         self.statut.sur_changement(self.actualiser_donnees)
@@ -66,22 +63,21 @@ class VueAlertes(Vue):
         self.type_alerte = ChampListe(barre, "Type", options=OPTIONS_TYPE, largeur=22)
         self.type_alerte.pack(side="left", padx=(16, 0))
         self.type_alerte.sur_changement(self.actualiser_donnees)
+        Bouton(barre, "Actualiser", self.actualiser_donnees).pack(side="right", pady=(16, 0))
 
-        boutons = ttk.Frame(barre)
-        boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
-        Bouton(boutons, "Actualiser", self.actualiser_donnees).pack(side="left")
-
-        corps = ttk.Frame(self.contenu)
-        corps.pack(fill="both", expand=True)
-        self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=16)
+        carte = self.carte(
+            "Alertes",
+            "Sélectionnez une alerte pour la prendre en charge ou la clôturer",
+            dernier=True,
+        )
+        self.tableau = TableauTriable(carte.zone, COLONNES_TABLEAU, hauteur=14)
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection)
 
-        actions = ttk.Frame(self.contenu)
-        actions.pack(fill="x", pady=(10, 0))
+        actions = carte.actions
         self.b_prendre_en_charge = Bouton(actions, "Prendre en charge", self.prendre_en_charge)
         self.b_prendre_en_charge.pack(side="left")
-        self.b_resoudre = Bouton(actions, "Clôturer l'alerte…", self.resoudre)
+        self.b_resoudre = Bouton(actions, "Clôturer l'alerte…", self.resoudre, primaire=True)
         self.b_resoudre.pack(side="left", padx=(8, 0))
         if not self.peut_traiter:
             self.b_prendre_en_charge.pack_forget()

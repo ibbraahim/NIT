@@ -9,8 +9,10 @@ from app.erreurs import DonneesInvalides, ErreurApplication, OperationImpossible
 from app.gui.style import PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
+from app.gui.widgets.carte import Carte, ajouter_carte
 from app.gui.widgets.champs import ChampCase, ChampDate, ChampListe, ChampNombre, appliquer_erreurs
 from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, confirmer, informer
+from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import FAMILLES_KPI, METHODES_COURTES, PERIODICITES, STATUTS_KPI, libelle
@@ -25,7 +27,7 @@ OPTION_TOUS_SITES = (None, "Tous les sites (cible générale)")
 OPTION_TOUTES_ZONES_SITE = (None, "Toutes les zones du site")
 
 COLONNES_TABLEAU = [
-    Colonne("kpi_libelle", "KPI", 220),
+    Colonne("kpi_libelle", "KPI", 300),
     Colonne("famille_libelle", "Famille", 130),
     Colonne("methode_libelle", "Méthode", 70, "center"),
     Colonne("valeur_affichee", "Valeur", 110, "e"),
@@ -62,7 +64,7 @@ class VueKpiCibles(Vue):
     sous_titre = "Suivi des 20 indicateurs et de leurs objectifs"
 
     def construire(self) -> None:
-        self.onglets = ttk.Notebook(self.contenu)
+        self.onglets = Onglets(self.contenu)
         self.onglets.pack(fill="both", expand=True)
         self.page_suivi = OngletSuiviKpi(self.onglets, self)
         self.onglets.add(self.page_suivi, text="Suivi des KPI")
@@ -81,7 +83,7 @@ class OngletSuiviKpi(ttk.Frame):
     """Filtres Site/Zone/Périodicité/Date, bouton de calcul, tableau des KPI."""
 
     def __init__(self, parent, vue: VueKpiCibles) -> None:
-        super().__init__(parent, padding=(0, 12))
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self.peut_calculer = a_le_droit(self.ctx, "UC17")
@@ -89,15 +91,15 @@ class OngletSuiviKpi(ttk.Frame):
         self._construire()
 
     def _construire(self) -> None:
-        barre = ttk.Frame(self)
-        barre.pack(fill="x", pady=(0, 10))
-        self.site = ChampListe(barre, "Site", largeur=22)
+        carte_filtres = ajouter_carte(self, marge=14)
+        barre = carte_filtres.zone
+        self.site = ChampListe(barre, "Site", largeur=20)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
-        self.zone = ChampListe(barre, "Zone", largeur=18)
+        self.zone = ChampListe(barre, "Zone", largeur=16)
         self.zone.pack(side="left", padx=(16, 0))
         self.zone.sur_changement(self.actualiser_donnees)
-        self.periodicite = ChampListe(barre, "Périodicité", options=OPTIONS_PERIODICITE, largeur=14)
+        self.periodicite = ChampListe(barre, "Périodicité", options=OPTIONS_PERIODICITE, largeur=11)
         self.periodicite.definir("semaine")
         self.periodicite.pack(side="left", padx=(16, 0))
         self.periodicite.sur_changement(self.actualiser_donnees)
@@ -105,40 +107,29 @@ class OngletSuiviKpi(ttk.Frame):
         self.date_reference.definir(date.today())
         self.date_reference.pack(side="left", padx=(16, 0))
         self.date_reference.sur_changement(self.actualiser_donnees)
-
-        barre2 = ttk.Frame(self)
-        barre2.pack(fill="x", pady=(0, 10))
-        self.famille = ChampListe(barre2, "Famille", options=OPTIONS_FAMILLE, largeur=22)
-        self.famille.pack(side="left")
+        self.famille = ChampListe(barre, "Famille", options=OPTIONS_FAMILLE, largeur=18)
+        self.famille.pack(side="left", padx=(16, 0))
         self.famille.sur_changement(self._filtrer_tableau)
 
-        boutons = ttk.Frame(barre2)
-        boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
+        carte = ajouter_carte(
+            self, "Indicateurs", "Sélectionnez un indicateur en alerte pour lire l'explication"
+        )
         self.b_calculer = Bouton(
-            boutons, "Calculer et comparer maintenant", self.calculer, primaire=True
+            carte.actions, "Calculer et comparer maintenant", self.calculer, primaire=True
         )
         self.b_calculer.pack(side="left")
         if not self.peut_calculer:
             self.b_calculer.pack_forget()
-
-        corps = ttk.Frame(self)
-        corps.pack(fill="both", expand=True)
-        self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=16)
+        self.tableau = TableauTriable(carte.zone, COLONNES_TABLEAU, hauteur=14)
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection_kpi)
 
-        self.cadre_interpretation = ttk.Frame(self, style="Carte.TFrame", padding=10)
+        self.cadre_interpretation = Carte(self, marge=16)
         self.label_explication = ttk.Label(
-            self.cadre_interpretation,
-            text="",
-            style="Section.TLabel",
-            background="#ffffff",
-            wraplength=900,
+            self.cadre_interpretation.zone, text="", style="Section.TLabel", wraplength=900
         )
         self.label_explication.pack(anchor="w")
-        self.label_conseil = ttk.Label(
-            self.cadre_interpretation, text="", background="#ffffff", wraplength=900
-        )
+        self.label_conseil = ttk.Label(self.cadre_interpretation.zone, text="", wraplength=900)
         self.label_conseil.pack(anchor="w", pady=(4, 0))
         self.cadre_interpretation.pack_forget()
 
@@ -156,7 +147,7 @@ class OngletSuiviKpi(ttk.Frame):
             return
         self.label_explication.configure(text=interpretation.explication)
         self.label_conseil.configure(text=f"Action suggérée — {interpretation.conseil}")
-        self.cadre_interpretation.pack(fill="x", pady=(10, 0))
+        self.cadre_interpretation.pack(fill="x")
 
     def actualiser(self) -> None:
         sites = self.vue.executer(lambda: admin.lister_sites(self.ctx)) or []
@@ -247,15 +238,17 @@ class OngletCibles(ttk.Frame):
     """Tableau des objectifs (tous sites) ; Ajouter / Modifier / Supprimer une cible."""
 
     def __init__(self, parent, vue: VueKpiCibles) -> None:
-        super().__init__(parent, padding=(0, 12))
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self.peut_definir_cibles = a_le_droit(self.ctx, "UC15")
         self._construire()
 
     def _construire(self) -> None:
-        boutons = ttk.Frame(self)
-        boutons.pack(fill="x", pady=(0, 10))
+        carte = ajouter_carte(
+            self, "Cibles", "Objectifs par KPI, par site ou par zone", dernier=True
+        )
+        boutons = carte.actions
         self.b_ajouter = Bouton(boutons, "Ajouter une cible", self._ajouter, primaire=True)
         self.b_ajouter.pack(side="left")
         self.b_modifier = Bouton(boutons, "Modifier la cible", self._modifier)
@@ -269,9 +262,7 @@ class OngletCibles(ttk.Frame):
             self.b_modifier.pack_forget()
             self.b_supprimer.pack_forget()
 
-        corps = ttk.Frame(self)
-        corps.pack(fill="both", expand=True)
-        self.tableau = TableauTriable(corps, COLONNES_CIBLES, hauteur=16)
+        self.tableau = TableauTriable(carte.zone, COLONNES_CIBLES, hauteur=14)
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection)
 

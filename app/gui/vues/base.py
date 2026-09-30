@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.gui.style import COULEURS
+from app.gui.widgets.carte import ECART_CARTES, Carte, ajouter_carte
 from app.gui.widgets.dialogues import executer_action
 
 
@@ -20,6 +21,8 @@ class Vue(ttk.Frame):
 
     titre = ""
     sous_titre = ""
+    #: Espace vertical entre deux cartes d'un écran.
+    ECART = ECART_CARTES
 
     def __init__(self, parent, application) -> None:
         super().__init__(parent, padding=(28, 10, 14, 10), style="Page.TFrame")
@@ -53,6 +56,23 @@ class Vue(ttk.Frame):
         canevas.bind("<Leave>", lambda _e: canevas.unbind_all("<MouseWheel>"))
 
         self.construire()
+
+    def carte(
+        self,
+        titre: str = "",
+        sous_titre: str = "",
+        parent: tk.Misc | None = None,
+        marge: int = 18,
+        expand: bool = False,
+        dernier: bool = False,
+    ) -> Carte:
+        """Carte arrondie ajoutée en bas de l'écran (ou de ``parent``) ; le contenu se pose dans
+        ``carte.zone``. ``dernier`` supprime l'espace sous la carte."""
+        return ajouter_carte(parent or self.contenu, titre, sous_titre, marge, expand, dernier)
+
+    def barre_filtres(self) -> ttk.Frame:
+        """Carte basse qui porte les filtres d'un écran ; renvoie le cadre où les placer."""
+        return self.carte(marge=14).zone
 
     def construire(self) -> None:
         """Crée les widgets de l'écran (à redéfinir)."""

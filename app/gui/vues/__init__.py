@@ -54,7 +54,7 @@ ECRANS: list[Ecran] = [
     ),
     Ecran(
         "comparaison",
-        "Comparaison réel / prévu",
+        "Réel / prévu",
         "app.gui.vues.comparaison",
         "VueComparaison",
         frozenset({R}),

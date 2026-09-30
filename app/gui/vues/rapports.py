@@ -56,8 +56,7 @@ class VueRapports(Vue):
         self.peut_generer = a_le_droit(self.ctx, "UC23")
         self.peut_exporter = a_le_droit(self.ctx, "UC24")
 
-        barre = ttk.Frame(self.contenu)
-        barre.pack(fill="x", pady=(0, 10))
+        barre = self.barre_filtres()
         self.periodicite = ChampListe(
             barre, "Type de période", options=OPTIONS_PERIODICITE, largeur=16
         )
@@ -70,21 +69,20 @@ class VueRapports(Vue):
         self.site.pack(side="left", padx=(16, 0))
         self.site.sur_changement(self.actualiser_donnees)
 
-        boutons = ttk.Frame(barre)
-        boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
-        self.b_generer = Bouton(boutons, "Générer le rapport", self.generer, primaire=True)
-        self.b_generer.pack(side="left")
+        self.b_generer = Bouton(barre, "Générer le rapport", self.generer, primaire=True)
+        self.b_generer.pack(side="right", pady=(16, 0))
         if not self.peut_generer:
             self.b_generer.pack_forget()
 
-        corps = ttk.Frame(self.contenu)
-        corps.pack(fill="both", expand=True)
-        self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=14)
+        carte = self.carte(
+            "Rapports générés", "Sélectionnez un rapport pour l'exporter ou l'ouvrir", dernier=True
+        )
+        self.tableau = TableauTriable(carte.zone, COLONNES_TABLEAU, hauteur=12)
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection)
 
-        actions = ttk.Frame(self.contenu)
-        actions.pack(fill="x", pady=(10, 0))
+        actions = ttk.Frame(carte.zone)
+        actions.pack(fill="x", pady=(14, 0))
         self.b_exporter_pdf = Bouton(actions, "Exporter en PDF", self.exporter_pdf)
         self.b_exporter_pdf.pack(side="left")
         self.b_exporter_excel = Bouton(actions, "Exporter en Excel", self.exporter_excel)

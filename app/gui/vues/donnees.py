@@ -8,6 +8,7 @@ from tkinter import ttk
 from app.erreurs import DonneesInvalides, ErreurApplication
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
+from app.gui.widgets.carte import ajouter_carte
 from app.gui.widgets.champs import ChampCase, ChampDate, ChampListe, ChampNombre, appliquer_erreurs
 from app.gui.widgets.dialogues import (
     afficher_erreur,
@@ -15,6 +16,7 @@ from app.gui.widgets.dialogues import (
     choisir_fichier_a_ouvrir,
     informer,
 )
+from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.resultat_import import ouvrir_resultat_import
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.services import admin, donnees
@@ -38,7 +40,7 @@ class VueDonnees(Vue):
     sous_titre = "Historique d'activité et demande client"
 
     def construire(self) -> None:
-        self.onglets = ttk.Notebook(self.contenu)
+        self.onglets = Onglets(self.contenu)
         self.onglets.pack(fill="both", expand=True)
         self.page_historique = OngletHistorique(self.onglets, self)
         self.onglets.add(self.page_historique, text="Historique d'activité")
@@ -59,7 +61,7 @@ class OngletSaisieImport(ttk.Frame):
     colonnes_tableau: list[Colonne] = []
 
     def __init__(self, parent, vue: VueDonnees) -> None:
-        super().__init__(parent, padding=12)
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self.sites: list[dict] = []
@@ -69,18 +71,19 @@ class OngletSaisieImport(ttk.Frame):
 
     # --- Construction ----------------------------------------------------
     def _construire_widgets(self) -> None:
-        cadre_formulaire = ttk.Frame(self, style="Carte.TFrame", padding=12)
+        carte_formulaire = ajouter_carte(
+            self, "Saisie manuelle", "Une ligne à la fois, ou import d'un fichier"
+        )
+        self.cadre_carte_formulaire = carte_formulaire.zone
+        cadre_formulaire = ttk.Frame(carte_formulaire.zone)
         cadre_formulaire.pack(fill="x")
-        ttk.Label(
-            cadre_formulaire, text="Saisie manuelle", style="Section.TLabel", background="#ffffff"
-        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
-        self.site = ChampListe(cadre_formulaire, "Site", style_cadre="Carte.TFrame")
+        self.site = ChampListe(cadre_formulaire, "Site")
         self.site.grid(row=1, column=0, sticky="we", padx=(0, 16), pady=(0, 8))
         self.site.sur_changement(self._sur_changement_site)
-        self.zone = ChampListe(cadre_formulaire, "Zone", style_cadre="Carte.TFrame")
+        self.zone = ChampListe(cadre_formulaire, "Zone")
         self.zone.grid(row=1, column=1, sticky="we", padx=(0, 16), pady=(0, 8))
         self.zone.sur_changement(self.actualiser_tableau)
-        self.champ_date = ChampDate(cadre_formulaire, "Date", style_cadre="Carte.TFrame")
+        self.champ_date = ChampDate(cadre_formulaire, "Date")
         self.champ_date.grid(row=1, column=2, sticky="w", pady=(0, 8))
 
         ligne, colonne = 2, 0
@@ -94,33 +97,30 @@ class OngletSaisieImport(ttk.Frame):
         for c in range(3):
             cadre_formulaire.columnconfigure(c, weight=1)
 
-        barre = ttk.Frame(self)
-        barre.pack(fill="x", pady=(10, 10))
-        Bouton(barre, "Enregistrer", self.enregistrer, primaire=True).pack(side="left")
-        Bouton(barre, "Effacer le formulaire", self.effacer_formulaire).pack(
+        self._barre_actions = ttk.Frame(carte_formulaire.zone)
+        self._barre_actions.pack(fill="x", pady=(8, 0))
+        Bouton(self._barre_actions, "Enregistrer", self.enregistrer, primaire=True).pack(
+            side="left"
+        )
+        Bouton(self._barre_actions, "Effacer le formulaire", self.effacer_formulaire).pack(
             side="left", padx=(8, 0)
         )
-        Bouton(barre, "Importer un fichier…", self.importer).pack(side="left", padx=(24, 0))
-        Bouton(barre, "Télécharger le modèle de fichier", self.telecharger_modele).pack(
-            side="left", padx=(8, 0)
+        Bouton(
+            self._barre_actions, "Télécharger le modèle de fichier", self.telecharger_modele
+        ).pack(side="right")
+        Bouton(self._barre_actions, "Importer un fichier…", self.importer).pack(
+            side="right", padx=(0, 8)
         )
 
-        ttk.Label(self, text=self.titre_tableau, style="Section.TLabel").pack(anchor="w")
-        self.tableau = TableauTriable(self, self.colonnes_tableau, hauteur=14)
-        self.tableau.pack(fill="both", expand=True, pady=(4, 0))
+        carte_tableau = ajouter_carte(self, self.titre_tableau, dernier=True)
+        self.tableau = TableauTriable(carte_tableau.zone, self.colonnes_tableau, hauteur=12)
+        self.tableau.pack(fill="both", expand=True)
 
     def _creer_widget_champ(self, parent, spec):
         if spec.type == "booleen":
-            return ChampCase(
-                parent, spec.libelle, valeur=bool(spec.defaut), style_cadre="Carte.TFrame"
-            )
+            return ChampCase(parent, spec.libelle, valeur=bool(spec.defaut))
         aide = "" if spec.obligatoire else "Facultatif : 0 si laissé vide."
-        return ChampNombre(
-            parent,
-            spec.libelle + (" *" if spec.obligatoire else ""),
-            aide=aide,
-            style_cadre="Carte.TFrame",
-        )
+        return ChampNombre(parent, spec.libelle + (" *" if spec.obligatoire else ""), aide=aide)
 
     # --- Rafraîchissement --------------------------------------------------
     def actualiser(self) -> None:
@@ -158,8 +158,10 @@ class OngletSaisieImport(ttk.Frame):
 
     def _erreur_generale(self, texte: str) -> None:
         if not hasattr(self, "_label_erreur"):
-            self._label_erreur = ttk.Label(self, text="", style="Erreur.TLabel", wraplength=700)
-            self._label_erreur.pack(anchor="w", before=self.tableau)
+            self._label_erreur = ttk.Label(
+                self.cadre_carte_formulaire, text="", style="Erreur.TLabel", wraplength=700
+            )
+            self._label_erreur.pack(anchor="w", before=self._barre_actions)
         self._label_erreur.configure(text=texte)
 
     # --- Actions -----------------------------------------------------------

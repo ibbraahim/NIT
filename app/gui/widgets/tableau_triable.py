@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
+from tkinter import font as tkfont
 from tkinter import ttk
 
 from app.gui.degrades import melanger
@@ -107,6 +108,7 @@ class TableauTriable(ttk.Frame):
     ) -> None:
         super().__init__(parent)
         self.colonnes = colonnes
+        self._hauteur_max = hauteur
         self._lignes: dict[str, dict] = {}
         self._tri: tuple[str, bool] | None = None
         self.arborescence = arborescence
@@ -120,16 +122,25 @@ class TableauTriable(ttk.Frame):
         if arborescence:
             self.arbre.heading("#0", text=titre_arbre, command=lambda: self.trier("#0"))
             self.arbre.column("#0", width=largeur_arbre, stretch=True)
+        police_entete = tkfont.Font(
+            root=self, font=ttk.Style(self).lookup("Treeview.Heading", "font") or "TkHeadingFont"
+        )
         for colonne in colonnes:
             self.arbre.heading(
-                colonne.cle, text=colonne.titre, command=lambda c=colonne.cle: self.trier(c)
+                colonne.cle,
+                text=colonne.titre,
+                anchor=colonne.alignement,
+                command=lambda c=colonne.cle: self.trier(c),
             )
+            # Un titre n'est jamais rogné : la colonne ne descend pas sous la largeur de son texte
+            # (l'ascenseur horizontal prend le relais si le tableau est plus large que la place).
+            largeur_titre = police_entete.measure(colonne.titre) + 28
             self.arbre.column(
                 colonne.cle,
-                width=colonne.largeur,
+                width=max(colonne.largeur, largeur_titre),
                 anchor=colonne.alignement,
                 stretch=colonne.etirable,
-                minwidth=40,
+                minwidth=max(40, largeur_titre, int(colonne.largeur * 0.9)),
             )
         for nom, options in self.ETIQUETTES.items():
             self.arbre.tag_configure(nom, **options)
@@ -220,6 +231,8 @@ class TableauTriable(ttk.Frame):
         conserver = [iid for iid in selection if self.arbre.exists(iid)]
         if conserver:
             self.arbre.selection_set(conserver)
+        # Le tableau épouse son contenu (au moins quelques lignes, au plus ``hauteur``).
+        self.arbre.configure(height=min(max(len(lignes), 4), self._hauteur_max))
         if lignes:
             self.message_vide.place_forget()
         else:

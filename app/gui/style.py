@@ -288,6 +288,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     style.configure("KpiValeur.TLabel", foreground=c["texte"], font=(famille, 22, "bold"))
     style.configure("Erreur.TLabel", foreground=c["rouge"], font=(famille, 9))
     style.configure("Gras.TLabel", font=(famille, TAILLE_POLICE, "bold"))
+    style.configure("Gagnant.TLabel", foreground=c["vert"], font=(famille, TAILLE_POLICE, "bold"))
     for statut in ("vert", "orange", "rouge", "gris"):
         style.configure(
             f"{statut.capitalize()}.TLabel",
@@ -462,43 +463,40 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         darkcolor=c["rouge"],
         fieldbackground=c["rouge_tres_clair"],
     )
-    style.configure("TCheckbutton", background=c["surface"], focuscolor=c["surface"])
-    style.map(
-        "TCheckbutton",
-        indicatorcolor=[("selected", c["accent"]), ("!selected", c["champ"])],
-        background=[("active", c["surface"])],
-    )
-    style.configure("Carte.TCheckbutton", background=c["surface"])
-    style.configure("TRadiobutton", background=c["surface"])
+    for nom in ("TCheckbutton", "Carte.TCheckbutton", "TRadiobutton"):
+        style.configure(
+            nom,
+            background=c["surface"],
+            foreground=c["texte"],
+            focuscolor=c["surface"],
+            indicatorbackground=c["champ"],
+            indicatorforeground="#FFFFFF",
+            upperbordercolor=c["champ_bordure"],
+            lowerbordercolor=c["champ_bordure"],
+            indicatorcolor=c["champ"],
+        )
+        style.map(
+            nom,
+            indicatorbackground=[("selected", c["accent"]), ("!selected", c["champ"])],
+            indicatorcolor=[("selected", c["accent"]), ("!selected", c["champ"])],
+            upperbordercolor=[("selected", c["accent"])],
+            lowerbordercolor=[("selected", c["accent"])],
+            background=[("active", c["surface"])],
+        )
     style.configure("TSeparator", background=c["bordure"])
 
-    # Onglets à plat : l'onglet actif se fond dans sa carte et passe en accent
+    # Onglets : le bandeau natif est masqué, la barre de pilules (widgets/onglets.py) le remplace
+    style.layout("Plat.TNotebook.Tab", [])
     style.configure(
-        "TNotebook",
+        "Plat.TNotebook",
         background=c["fond"],
         borderwidth=0,
-        bordercolor=c["bordure"],
-        tabmargins=(0, 0, 0, 0),
-    )
-    style.configure(
-        "TNotebook.Tab",
-        padding=(18, 9),
-        background=c["fond"],
-        foreground=c["texte_secondaire"],
         bordercolor=c["fond"],
         lightcolor=c["fond"],
         darkcolor=c["fond"],
-        borderwidth=0,
-        font=(famille, TAILLE_POLICE, "bold"),
+        tabmargins=(0, 0, 0, 0),
     )
-    style.map(
-        "TNotebook.Tab",
-        background=[("selected", c["surface"]), ("active", c["surface_2"])],
-        foreground=[("selected", c["accent"]), ("active", c["texte"])],
-        bordercolor=[("selected", c["bordure"])],
-        lightcolor=[("selected", c["surface"])],
-        darkcolor=[("selected", c["surface"])],
-    )
+    style.configure("TNotebook", background=c["fond"], borderwidth=0, tabmargins=(0, 0, 0, 0))
 
     # Tableaux : lignes aérées, en-tête discret, sélection teintée d'accent
     style.configure(

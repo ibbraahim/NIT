@@ -11,7 +11,7 @@ from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
-from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
+from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.services import admin, planification
@@ -23,16 +23,16 @@ from app.utils.format_fr import formater_date, formater_nombre
 OPTIONS_HORIZON = [(h, f"{h} jours") for h in HORIZONS_VALIDES]
 
 COLONNES_TABLEAU = [
-    Colonne("date_jour", "Date", 100, "center"),
-    Colonne("zone", "Zone", 120),
-    Colonne("volume_prevu", "Volume demandé", 110, "e"),
-    Colonne("heures_rl", "Heures RL", 100, "e"),
-    Colonne("heures_rn", "Heures RN", 100, "e"),
-    Colonne("effectif_rl", "Effectif RL", 100, "e"),
-    Colonne("effectif_rn", "Effectif RN", 100, "e"),
-    Colonne("equipements_rl", "Équipements RL", 120, "e"),
-    Colonne("equipements_rn", "Équipements RN", 120, "e"),
-    Colonne("ic_actif", "Intervalle de confiance", 170, "center"),
+    Colonne("date_jour", "Date", 95, "center"),
+    Colonne("zone", "Zone", 105),
+    Colonne("volume_prevu", "Volume demandé", 125, "e"),
+    Colonne("heures_rl", "Heures RL", 88, "e"),
+    Colonne("heures_rn", "Heures RN", 88, "e"),
+    Colonne("effectif_rl", "Effectif RL", 92, "e"),
+    Colonne("effectif_rn", "Effectif RN", 92, "e"),
+    Colonne("equipements_rl", "Équip. RL", 88, "e"),
+    Colonne("equipements_rn", "Équip. RN", 88, "e"),
+    Colonne("ic_actif", "Intervalle de confiance", 150, "center"),
     Colonne("modele_actif_coche", "Modèle actif", 100, "center"),
 ]
 
@@ -55,9 +55,8 @@ class VuePrevisions(Vue):
 
     def construire(self) -> None:
         self.peut_generer = a_le_droit(self.ctx, "UC11")
-        barre = ttk.Frame(self.contenu)
-        barre.pack(fill="x", pady=(0, 10))
-        self.site = ChampListe(barre, "Site", largeur=26)
+        barre = self.barre_filtres()
+        self.site = ChampListe(barre, "Site", largeur=24)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
         self.zone = ChampListe(barre, "Zone", largeur=22)
@@ -68,7 +67,7 @@ class VuePrevisions(Vue):
         self.horizon.sur_changement(self.actualiser_donnees)
 
         boutons = ttk.Frame(barre)
-        boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
+        boutons.pack(side="right", pady=(16, 0))
         self.b_generer = Bouton(boutons, "Générer les prévisions", self.generer, primaire=True)
         self.b_generer.pack(side="left")
         if not self.peut_generer:
@@ -76,18 +75,16 @@ class VuePrevisions(Vue):
         self.b_exporter = Bouton(boutons, "Exporter en Excel", self.exporter)
         self.b_exporter.pack(side="left", padx=(8, 0))
 
-        corps = ttk.Frame(self.contenu)
-        corps.pack(fill="both", expand=True)
-        self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=14)
+        carte_tableau = self.carte("Prévisions par jour", "Une ligne par jour et par zone")
+        self.tableau = TableauTriable(carte_tableau.zone, COLONNES_TABLEAU, hauteur=10)
         self.tableau.pack(fill="both", expand=True)
 
-        ttk.Label(
-            self.contenu,
-            text="Heures nécessaires : réel des deux méthodes, avec la "
-            "bande de confiance de la méthode retenue",
-            style="Section.TLabel",
-        ).pack(anchor="w", pady=(10, 4))
-        self.graphique = GraphiqueIntegre(self.contenu, largeur=9, hauteur=3.2)
+        carte_graphique = self.carte(
+            "Heures nécessaires",
+            "Réel des deux méthodes, avec la bande de confiance de la méthode retenue",
+            dernier=True,
+        )
+        self.graphique = GraphiqueIntegre(carte_graphique.zone, largeur=9, hauteur=3.2)
         self.graphique.pack(fill="both", expand=True)
 
     def actualiser(self) -> None:
@@ -129,7 +126,6 @@ class VuePrevisions(Vue):
         self.tableau.charger(
             lignes,
             cle_id="date_jour",
-            etiquettes=lambda l: "vert" if l["modele_actif"] else None,
             message_vide="Aucune prévision générée pour cette période. "
             "Utilisez « Générer les prévisions ».",
         )
@@ -175,7 +171,7 @@ class VuePrevisions(Vue):
                     label="Intervalle de confiance (méthode retenue)",
                 )
             axe.set_ylabel("Heures nécessaires")
-            axe.legend(fontsize=8, loc="upper left")
+            legende_en_haut(axe)
             axe.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=10))
             axe.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
             axe.tick_params(axis="x", rotation=30)

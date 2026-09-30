@@ -5,12 +5,14 @@ from __future__ import annotations
 from tkinter import ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS
+from app.gui.style import COULEURS, PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
+from app.gui.widgets.carte import ECART_CARTES, ajouter_carte
 from app.gui.widgets.champs import ChampCase, ChampListe, ChampNombre, ChampTexte, appliquer_erreurs
 from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, confirmer, informer
 from app.gui.widgets.graphique import COULEURS_SERIES, GraphiqueIntegre
+from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import CIBLES_MODELE, METHODES
@@ -35,7 +37,7 @@ class VueModeles(Vue):
     sous_titre = "Paramétrage, entraînement et activation des modèles de prévision"
 
     def construire(self) -> None:
-        self.onglets = ttk.Notebook(self.contenu)
+        self.onglets = Onglets(self.contenu)
         self.onglets.pack(fill="both", expand=True)
         self.page_parametres = OngletParametres(self.onglets, self)
         self.onglets.add(self.page_parametres, text="Paramètres")
@@ -55,89 +57,71 @@ class OngletParametres(ttk.Frame):
     valeurs par défaut »."""
 
     def __init__(self, parent, vue: VueModeles) -> None:
-        super().__init__(parent, padding=12)
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self.widgets: dict[str, object] = {}
         self._construire()
 
     def _construire(self) -> None:
-        cadre = ttk.Frame(self, style="Carte.TFrame", padding=14)
-        cadre.pack(fill="x")
-
-        ttk.Label(
-            cadre, text="Variables d'entrée actives", style="Section.TLabel", background="#ffffff"
-        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        carte = ajouter_carte(
+            self,
+            "Variables d'entrée actives",
+            "Les variables prises en compte par les deux modèles",
+        )
+        cadre = carte.zone
         self.variables: dict[str, ChampCase] = {}
         for i, cle in enumerate(VARIABLES_PAR_DEFAUT):
-            case = ChampCase(
-                cadre, LIBELLES_VARIABLES[cle], valeur=True, style_cadre="Carte.TFrame"
-            )
-            case.grid(row=1 + i // 3, column=i % 3, sticky="w", padx=(0, 20))
+            case = ChampCase(cadre, LIBELLES_VARIABLES[cle], valeur=True)
+            case.grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 28), pady=2)
             self.variables[cle] = case
         self.variables["volume"].activer(False)
         self.variables["volume"].saisie.configure(
             text=LIBELLES_VARIABLES["volume"] + " (toujours active)"
         )
 
-        ligne = 1 + (len(VARIABLES_PAR_DEFAUT) - 1) // 3 + 1
-        ttk.Label(
-            cadre, text="Réseau de neurones", style="Section.TLabel", background="#ffffff"
-        ).grid(row=ligne, column=0, columnspan=3, sticky="w", pady=(14, 0))
-        ligne += 1
+        carte = ajouter_carte(self, "Réseau de neurones", "Architecture et entraînement")
+        cadre = carte.zone
         self.widgets["hidden_layer_sizes"] = ChampTexte(
-            cadre, "Couches cachées (ex. 32,16)", largeur=20, style_cadre="Carte.TFrame"
+            cadre, "Couches cachées (ex. 32,16)", largeur=20
         )
-        self.widgets["hidden_layer_sizes"].grid(row=ligne, column=0, sticky="w", padx=(0, 20))
+        self.widgets["hidden_layer_sizes"].grid(row=0, column=0, sticky="w", padx=(0, 24))
         self.widgets["activation"] = ChampListe(
-            cadre, "Fonction d'activation", options=OPTIONS_ACTIVATION, style_cadre="Carte.TFrame"
+            cadre, "Fonction d'activation", options=OPTIONS_ACTIVATION
         )
-        self.widgets["activation"].grid(row=ligne, column=1, sticky="w", padx=(0, 20))
-        self.widgets["max_iter"] = ChampNombre(
-            cadre, "Itérations maximum", decimales=0, style_cadre="Carte.TFrame"
-        )
-        self.widgets["max_iter"].grid(row=ligne, column=2, sticky="w")
+        self.widgets["activation"].grid(row=0, column=1, sticky="w", padx=(0, 24))
+        self.widgets["max_iter"] = ChampNombre(cadre, "Itérations maximum", decimales=0)
+        self.widgets["max_iter"].grid(row=0, column=2, sticky="w")
 
-        ligne += 1
-        ttk.Label(
-            cadre, text="Découpage et fiabilité", style="Section.TLabel", background="#ffffff"
-        ).grid(row=ligne, column=0, columnspan=3, sticky="w", pady=(14, 0))
-        ligne += 1
-        self.widgets["part_test"] = ChampNombre(
-            cadre, "Part du jeu de test (%)", decimales=0, style_cadre="Carte.TFrame"
+        carte = ajouter_carte(
+            self, "Découpage et fiabilité", "Jeu de test, intervalle de confiance et dérive"
         )
-        self.widgets["part_test"].grid(row=ligne, column=0, sticky="w", padx=(0, 20))
+        cadre = carte.zone
+        self.widgets["part_test"] = ChampNombre(cadre, "Part du jeu de test (%)", decimales=0)
+        self.widgets["part_test"].grid(row=0, column=0, sticky="w", padx=(0, 24))
         self.widgets["niveau_confiance"] = ChampNombre(
-            cadre,
-            "Niveau de l'intervalle de confiance (%)",
-            decimales=0,
-            style_cadre="Carte.TFrame",
+            cadre, "Niveau de l'intervalle de confiance (%)", decimales=0
         )
-        self.widgets["niveau_confiance"].grid(row=ligne, column=1, sticky="w", padx=(0, 20))
+        self.widgets["niveau_confiance"].grid(row=0, column=1, sticky="w", padx=(0, 24))
         self.widgets["seuil_derive_mape"] = ChampNombre(
-            cadre, "Seuil de dérive — MAPE (%)", decimales=0, style_cadre="Carte.TFrame"
+            cadre, "Seuil de dérive — MAPE (%)", decimales=0
         )
-        self.widgets["seuil_derive_mape"].grid(row=ligne, column=2, sticky="w")
+        self.widgets["seuil_derive_mape"].grid(row=0, column=2, sticky="w")
 
-        ligne += 1
-        ttk.Label(
-            cadre, text="Réentraînement automatique", style="Section.TLabel", background="#ffffff"
-        ).grid(row=ligne, column=0, columnspan=3, sticky="w", pady=(14, 0))
-        ligne += 1
-        self.widgets["jour_reentrainement"] = ChampListe(
-            cadre, "Jour", options=OPTIONS_JOURS, style_cadre="Carte.TFrame"
+        carte = ajouter_carte(
+            self, "Réentraînement automatique", "Jour et heure de la tâche hebdomadaire"
         )
-        self.widgets["jour_reentrainement"].grid(row=ligne, column=0, sticky="w", padx=(0, 20))
-        self.widgets["heure_reentrainement"] = ChampTexte(
-            cadre, "Heure (HH:MM)", largeur=10, style_cadre="Carte.TFrame"
-        )
-        self.widgets["heure_reentrainement"].grid(row=ligne, column=1, sticky="w")
+        cadre = carte.zone
+        self.widgets["jour_reentrainement"] = ChampListe(cadre, "Jour", options=OPTIONS_JOURS)
+        self.widgets["jour_reentrainement"].grid(row=0, column=0, sticky="w", padx=(0, 24))
+        self.widgets["heure_reentrainement"] = ChampTexte(cadre, "Heure (HH:MM)", largeur=10)
+        self.widgets["heure_reentrainement"].grid(row=0, column=1, sticky="w")
 
         self.message_general = ttk.Label(self, text="", style="Erreur.TLabel", wraplength=760)
-        self.message_general.pack(anchor="w", pady=(8, 0))
+        self.message_general.pack(anchor="w", pady=(0, 8))
 
-        barre = ttk.Frame(self)
-        barre.pack(fill="x", pady=(10, 0))
+        barre = ttk.Frame(self, style="Page.TFrame")
+        barre.pack(fill="x")
         Bouton(barre, "Enregistrer les paramètres", self.enregistrer, primaire=True).pack(
             side="left"
         )
@@ -236,72 +220,76 @@ class OngletEntrainement(ttk.Frame):
     """Sélection site/zone, entraînement, tableau des versions, activation, résidus."""
 
     def __init__(self, parent, vue: VueModeles) -> None:
-        super().__init__(parent, padding=12)
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self._construire()
 
     def _construire(self) -> None:
-        self.bandeau_derive = ttk.Frame(self, style="Derive.TFrame", padding=(10, 6))
+        self.bandeau_derive = ttk.Frame(self, style="Derive.TFrame", padding=(16, 10))
         self.label_derive = ttk.Label(
             self.bandeau_derive, text="", style="Derive.TLabel", wraplength=900
         )
         self.label_derive.pack(anchor="w")
-        self.bandeau_derive.pack(fill="x", pady=(0, 8))
+        self.bandeau_derive.pack(fill="x", pady=(0, ECART_CARTES))
         self.bandeau_derive.pack_forget()  # masqué tant qu'aucune alerte de dérive n'est connue
 
-        haut = ttk.Frame(self)
-        self.haut_barre = haut
-        haut.pack(fill="x", pady=(0, 8))
-        self.site = ChampListe(haut, "Site", largeur=28)
+        carte_filtres = ajouter_carte(self, marge=14)
+        self.haut_barre = carte_filtres
+        haut = carte_filtres.zone
+        self.site = ChampListe(haut, "Site", largeur=26)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
-        self.zone = ChampListe(haut, "Zone", largeur=24)
+        self.zone = ChampListe(haut, "Zone", largeur=22)
         self.zone.pack(side="left", padx=(16, 0))
         self.zone.sur_changement(self.actualiser_tableau)
         self.b_entrainer = Bouton(haut, "Entraîner maintenant", self.entrainer, primaire=True)
-        self.b_entrainer.pack(side="left", padx=(24, 0), pady=(14, 0))
+        self.b_entrainer.pack(side="right", pady=(16, 0))
 
-        corps = ttk.Frame(self)
-        corps.pack(fill="both", expand=True)
-        gauche = ttk.Frame(corps)
-        gauche.pack(side="left", fill="both", expand=True)
+        carte_versions = ajouter_carte(
+            self,
+            "Versions entraînées",
+            "Sélectionnez une version pour l'activer ou voir ses résidus",
+        )
         self.tableau = TableauTriable(
-            gauche,
+            carte_versions.zone,
             [
                 Colonne("methode_libelle", "Méthode", 150),
-                Colonne("cible_libelle", "Cible", 150),
-                Colonne("zone", "Zone", 120),
-                Colonne("date_entrainement", "Date", 150, formateur=formater_date_heure),
-                Colonne("mae", "MAE", 90, "e", formateur=lambda v: formater_nombre(v, 2)),
-                Colonne("rmse", "RMSE", 90, "e", formateur=lambda v: formater_nombre(v, 2)),
-                Colonne("mape", "MAPE", 90, "e", formateur=lambda v: formater_pourcentage(v, 1)),
+                Colonne("cible_libelle", "Cible", 120),
+                Colonne("zone", "Zone", 110),
+                Colonne("date_entrainement", "Date", 140, formateur=formater_date_heure),
+                Colonne("mae", "MAE", 75, "e", formateur=lambda v: formater_nombre(v, 2)),
+                Colonne("rmse", "RMSE", 75, "e", formateur=lambda v: formater_nombre(v, 2)),
+                Colonne("mape", "MAPE", 75, "e", formateur=lambda v: formater_pourcentage(v, 1)),
                 Colonne(
-                    "biais", "Biais", 90, "e", formateur=lambda v: formater_pourcentage(v, 1, True)
+                    "biais", "Biais", 75, "e", formateur=lambda v: formater_pourcentage(v, 1, True)
                 ),
                 Colonne(
                     "couverture_ic",
                     "Couverture IC",
-                    110,
+                    105,
                     "e",
                     formateur=lambda v: formater_pourcentage(v, 1),
                 ),
-                Colonne("actif", "Actif", 70, "center"),
+                Colonne("actif", "Actif", 60, "center"),
                 Colonne("retenue_pour_plan", "Retenue pour le plan", 150, "center"),
             ],
-            hauteur=12,
+            hauteur=10,
         )
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self._sur_selection)
-        self.b_activer = Bouton(gauche, "Activer la version sélectionnée", self.activer)
-        self.b_activer.pack(anchor="w", pady=(8, 0))
-
-        droite = ttk.Frame(corps, padding=(14, 0, 0, 0))
-        droite.pack(side="left", fill="both")
-        ttk.Label(droite, text="Graphique des résidus (jeu de test)", style="Section.TLabel").pack(
-            anchor="w"
+        self.b_activer = Bouton(
+            carte_versions.actions, "Activer la version sélectionnée", self.activer
         )
-        self.graphique = GraphiqueIntegre(droite, largeur=5, hauteur=4)
+        self.b_activer.pack(anchor="e")
+
+        carte_residus = ajouter_carte(
+            self,
+            "Résidus du jeu de test",
+            "Écart entre le réel et le prédit, par valeur prédite",
+            dernier=True,
+        )
+        self.graphique = GraphiqueIntegre(carte_residus.zone, largeur=8, hauteur=3.2)
         self.graphique.pack(fill="both", expand=True)
         self.graphique.afficher_message("Sélectionnez une version pour voir ses résidus.")
 
@@ -338,12 +326,10 @@ class OngletEntrainement(ttk.Frame):
         if not ouvertes:
             self.bandeau_derive.pack_forget()
             return
-        texte = " · ".join(
-            f"{'⛔' if a['niveau'] == 'rouge' else '⚠'} {a['message']}" for a in ouvertes
-        )
+        texte = " · ".join(f"{PUCE_STATUT} {a['message']}" for a in ouvertes)
         texte += f" — {recommandations.suggestion_alerte('derive_modele')}"
         self.label_derive.configure(text=texte)
-        self.bandeau_derive.pack(fill="x", pady=(0, 8), before=self.haut_barre)
+        self.bandeau_derive.pack(fill="x", pady=(0, ECART_CARTES), before=self.haut_barre)
 
     def actualiser_tableau(self) -> None:
         site_id = self.site.valeur()
@@ -391,7 +377,12 @@ class OngletEntrainement(ttk.Frame):
             axe.axhline(0, color=COULEURS["texte_secondaire"], linewidth=1, linestyle="--")
             axe.set_xlabel("Valeur prédite")
             axe.set_ylabel("Résidu (réel − prédit)")
-            axe.set_title(f"{ligne['methode_libelle']} — {ligne['cible_libelle']}", fontsize=10)
+            axe.set_title(
+                f"{ligne['methode_libelle']} — {ligne['cible_libelle']}",
+                fontsize=9,
+                loc="left",
+                color=COULEURS["texte_secondaire"],
+            )
 
         self.graphique.dessiner(_dessiner)
 

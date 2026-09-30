@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from tkinter import ttk
 
 from app.erreurs import ConflitMiseAJour, DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS, PUCE_STATUT, a_chaque_theme
+from app.gui.style import COULEURS, COULEURS_STATUT, PUCE_STATUT, a_chaque_theme
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe, ChampNombre
@@ -18,6 +18,7 @@ from app.gui.widgets.dialogues import (
     informer,
     saisir_texte,
 )
+from app.gui.widgets.entete import BoutonIcone
 from app.gui.widgets.infobulle import InfoBulle
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.libelles import STATUTS_PLAN, TYPES_EQUIPEMENT
@@ -35,9 +36,44 @@ def _couleurs_cases() -> None:
         {
             "rouge": COULEURS["rouge_clair"],
             "orange": COULEURS["orange_clair"],
-            None: COULEURS["surface"],
+            None: COULEURS["surface_2"],
         }
     )
+
+
+class LienAction(tk.Label):
+    """Petite action textuelle (« Commentaire ») : accent, soulignée au survol, activable."""
+
+    def __init__(self, parent, texte: str, commande, fond: str) -> None:
+        self._commande = commande
+        self._actif = True
+        self._fond = fond
+        super().__init__(
+            parent,
+            text=texte,
+            foreground=COULEURS["accent"],
+            background=fond,
+            font=("", 8, "bold"),
+            cursor="hand2",
+        )
+        self.bind("<Enter>", lambda _e: self._souligner(True))
+        self.bind("<Leave>", lambda _e: self._souligner(False))
+        self.bind("<ButtonRelease-1>", lambda _e: self.invoke())
+
+    def _souligner(self, oui: bool) -> None:
+        if self._actif:
+            self.configure(font=("", 8, "bold underline" if oui else "bold"))
+
+    def invoke(self) -> None:
+        if self._actif:
+            self._commande()
+
+    def activer(self, actif: bool, raison: str = "") -> None:
+        self._actif = actif
+        self.configure(
+            foreground=COULEURS["accent"] if actif else COULEURS["desactive"],
+            cursor="hand2" if actif else "arrow",
+        )
 
 
 class VuePlanCharge(Vue):
@@ -52,26 +88,32 @@ class VuePlanCharge(Vue):
         self.zones: list[dict] = []
         self.cellules: dict[tuple, dict] = {}
 
-        haut = ttk.Frame(self.contenu)
-        haut.pack(fill="x")
-        self.site = ChampListe(haut, "Site", largeur=26)
+        barre_filtres = self.barre_filtres()
+        self.site = ChampListe(barre_filtres, "Site", largeur=24)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
-        nav = ttk.Frame(haut)
-        nav.pack(side="left", padx=(24, 0), pady=(14, 0))
-        Bouton(nav, "◀ Semaine précédente", lambda: self._changer_semaine(-1)).pack(side="left")
-        self.label_semaine = ttk.Label(nav, text="", style="Gras.TLabel")
-        self.label_semaine.pack(side="left", padx=12)
-        Bouton(nav, "Semaine suivante ▶", lambda: self._changer_semaine(1)).pack(side="left")
+        nav = ttk.Frame(barre_filtres)
+        nav.pack(side="right", pady=(16, 0))
+        BoutonIcone(
+            nav, "chevron_gauche", lambda: self._changer_semaine(-1), "Semaine précédente", 36
+        ).pack(side="left")
+        self.label_semaine = ttk.Label(nav, text="", style="Gras.TLabel", width=34, anchor="center")
+        self.label_semaine.pack(side="left", padx=8)
+        BoutonIcone(
+            nav, "chevron_droite", lambda: self._changer_semaine(1), "Semaine suivante", 36
+        ).pack(side="left")
 
-        statut = ttk.Frame(self.contenu)
-        statut.pack(fill="x", pady=(8, 4))
-        self.label_statut = ttk.Label(statut, text="", style="Gras.TLabel")
-        self.label_statut.pack(side="left")
-        self.label_commentaire = ttk.Label(statut, text="", style="Aide.TLabel", wraplength=700)
-        self.label_commentaire.pack(side="left", padx=(12, 0))
+        carte = self.carte(
+            "Plan de la semaine",
+            "Effectif, intérim et équipements par zone et par jour",
+            dernier=True,
+        )
+        self.label_statut = ttk.Label(carte.actions, text="", style="Gras.TLabel")
+        self.label_statut.pack(side="right")
+        self.label_commentaire = ttk.Label(carte.zone, text="", style="Aide.TLabel", wraplength=900)
+        self.label_commentaire.pack(anchor="w")
 
-        zone_grille = ttk.Frame(self.contenu)
+        zone_grille = ttk.Frame(carte.zone)
         zone_grille.pack(fill="both", expand=True, pady=(4, 8))
         self._canevas_grille = tk.Canvas(
             zone_grille, highlightthickness=0, background=COULEURS["surface"]
@@ -83,7 +125,7 @@ class VuePlanCharge(Vue):
         self._canevas_grille.pack(side="top", fill="both", expand=True)
         ascenseur_h.pack(side="bottom", fill="x")
 
-        self.cadre_grille = ttk.Frame(self._canevas_grille, style="Carte.TFrame", padding=8)
+        self.cadre_grille = ttk.Frame(self._canevas_grille)
         self._canevas_grille.create_window((0, 0), window=self.cadre_grille, anchor="nw")
 
         def _grille_a_jour(_evenement=None) -> None:
@@ -103,8 +145,8 @@ class VuePlanCharge(Vue):
             "<Leave>", lambda _e: self._canevas_grille.unbind_all("<Shift-MouseWheel>")
         )
 
-        barre = ttk.Frame(self.contenu)
-        barre.pack(fill="x")
+        barre = ttk.Frame(carte.zone)
+        barre.pack(fill="x", pady=(6, 0))
         if self.ctx.role == "planificateur":
             Bouton(barre, "Proposer le plan", self.proposer, primaire=True).pack(side="left")
             Bouton(barre, "Simuler un scénario…", self.simuler).pack(side="left", padx=(8, 0))
@@ -230,16 +272,13 @@ class VuePlanCharge(Vue):
             and self.plan_donnees is not None
             and self.plan_donnees["plan"]["statut"] in STATUTS_MODIFIABLES
         )
-        ttk.Label(self.cadre_grille, text="Zone", style="Gras.TLabel", background="#ffffff").grid(
-            row=0, column=0, sticky="w", padx=4, pady=2
+        ttk.Label(self.cadre_grille, text="Zone", style="KpiTitre.TLabel").grid(
+            row=0, column=0, sticky="w", padx=(0, 10), pady=(0, 6)
         )
         for c, jour in enumerate(jours, start=1):
             ttk.Label(
-                self.cadre_grille,
-                text=formater_jour_court(jour),
-                style="Gras.TLabel",
-                background="#ffffff",
-            ).grid(row=0, column=c, padx=4, pady=2)
+                self.cadre_grille, text=formater_jour_court(jour), style="KpiTitre.TLabel"
+            ).grid(row=0, column=c, pady=(0, 6))
         if not self.zones:
             ttk.Label(self.cadre_grille, text="Choisissez un site.", style="Aide.TLabel").grid(
                 row=1, column=0, sticky="w"
@@ -249,8 +288,8 @@ class VuePlanCharge(Vue):
         if self.plan_donnees is not None:
             lignes_index = {(l["zone_id"], l["date_jour"]): l for l in self.plan_donnees["lignes"]}
         for r, zone in enumerate(self.zones, start=1):
-            ttk.Label(self.cadre_grille, text=zone["nom"]).grid(
-                row=r, column=0, sticky="w", padx=4, pady=2
+            ttk.Label(self.cadre_grille, text=zone["nom"], style="Gras.TLabel").grid(
+                row=r, column=0, sticky="w", padx=(0, 10), pady=3
             )
             for c, jour in enumerate(jours, start=1):
                 ligne = lignes_index.get((zone["id"], jour))
@@ -259,59 +298,95 @@ class VuePlanCharge(Vue):
     def _construire_cellule(
         self, r: int, c: int, zone: dict, jour: date, ligne: dict | None, modifiable: bool
     ) -> None:
+        couleurs = COULEURS
         if ligne is None:
-            cadre = ttk.Frame(self.cadre_grille, style="Surface.TFrame", padding=4)
-            cadre.grid(row=r, column=c, padx=2, pady=2, sticky="nsew")
-            ttk.Label(cadre, text="—", background="#ffffff", style="Aide.TLabel").pack()
+            cadre = tk.Frame(
+                self.cadre_grille,
+                background=couleurs["surface_2"],
+                highlightbackground=couleurs["bordure"],
+                highlightthickness=1,
+            )
+            cadre.grid(row=r, column=c, padx=2, pady=3, sticky="nsew")
+            tk.Label(
+                cadre,
+                text="—",
+                background=couleurs["surface_2"],
+                foreground=couleurs["texte_secondaire"],
+            ).pack(expand=True, pady=30)
             return
         statut = planification.statut_couleur_ligne(ligne)
+        fond_case = COULEUR_CASE[statut]
         cadre = tk.Frame(
             self.cadre_grille,
-            background=COULEUR_CASE[statut],
-            highlightbackground=COULEURS["bordure"],
+            background=fond_case,
+            highlightbackground=(
+                COULEURS_STATUT.get(statut, couleurs["bordure"]) if statut else couleurs["bordure"]
+            ),
             highlightthickness=1,
         )
-        cadre.grid(row=r, column=c, padx=2, pady=2, sticky="nsew")
-        fond = {"background": COULEUR_CASE[statut]}
+        cadre.grid(row=r, column=c, padx=2, pady=3, sticky="nsew")
+        interieur = tk.Frame(cadre, background=fond_case)
+        interieur.pack(padx=6, pady=6)
+        fond = {"background": fond_case}
         tk.Label(
-            cadre,
+            interieur,
             text=f"Besoin {formater_nombre(ligne['besoin_heures'], 0)} h",
+            foreground=couleurs["texte"],
+            font=("", 9, "bold"),
             **fond,
-            font=("", 8),
         ).pack(anchor="w")
         tk.Label(
-            cadre,
-            text=f"{ligne['besoin_effectif']} p / {ligne['besoin_equipements']} éq",
-            **fond,
+            interieur,
+            text=f"{ligne['besoin_effectif']} p · {ligne['besoin_equipements']} éq",
+            foreground=couleurs["texte_secondaire"],
             font=("", 8),
+            **fond,
         ).pack(anchor="w")
 
-        saisie = tk.Frame(cadre, **fond)
-        saisie.pack(anchor="w", pady=(2, 2))
+        saisie = tk.Frame(interieur, **fond)
+        saisie.pack(anchor="w", pady=(5, 4))
         var_eff = tk.StringVar(value=str(ligne["effectif_planifie"]))
         var_int = tk.StringVar(value=str(ligne["interim_planifie"]))
         var_eqp = tk.StringVar(value=str(ligne["equipements_planifies"]))
-        largeur_champ = 3
-        for prefixe, variable in (("Pl.", var_eff), ("Int.", var_int), ("Éq.", var_eqp)):
-            tk.Label(saisie, text=prefixe, **fond, font=("", 8)).pack(side="left")
-            entree = tk.Entry(saisie, textvariable=variable, width=largeur_champ)
-            entree.configure(state="normal" if modifiable else "disabled")
-            entree.pack(side="left", padx=(1, 6))
+        for colonne, (prefixe, variable) in enumerate(
+            (("Plan.", var_eff), ("Intér.", var_int), ("Équip.", var_eqp))
+        ):
+            tk.Label(
+                saisie, text=prefixe, foreground=couleurs["texte_secondaire"], font=("", 7), **fond
+            ).grid(row=0, column=colonne, sticky="w", padx=(0 if colonne == 0 else 4, 0))
+            entree = tk.Entry(
+                saisie,
+                textvariable=variable,
+                width=3,
+                justify="center",
+                relief="flat",
+                borderwidth=2,
+                highlightthickness=1,
+                highlightbackground=couleurs["champ_bordure"],
+                highlightcolor=couleurs["accent"],
+                background=couleurs["champ"],
+                foreground=couleurs["texte"],
+                insertbackground=couleurs["texte"],
+                disabledbackground=couleurs["surface_2"],
+                disabledforeground=couleurs["texte_secondaire"],
+                state="normal" if modifiable else "disabled",
+            )
+            entree.grid(row=1, column=colonne, padx=(0 if colonne == 0 else 4, 0))
 
         tk.Label(
-            cadre,
-            text=f"Capacité {ligne['capacite_effectif']} p / "
-            f"{ligne['capacite_equipements']} éq",
-            **fond,
+            interieur,
+            text=f"Capacité {ligne['capacite_effectif']} p · {ligne['capacite_equipements']} éq",
+            foreground=couleurs["texte_secondaire"],
             font=("", 8),
+            **fond,
         ).pack(anchor="w")
 
         commentaire_var = {"texte": ligne["commentaire"]}
-        texte_bouton = "commentaire ✓" if ligne["commentaire"] else "commentaire"
-        bouton_commentaire = Bouton(
-            cadre, texte_bouton, lambda: self._editer_commentaire(zone["id"], jour)
+        texte_bouton = "Commentaire ✓" if ligne["commentaire"] else "Commentaire"
+        bouton_commentaire = LienAction(
+            interieur, texte_bouton, lambda: self._editer_commentaire(zone["id"], jour), fond_case
         )
-        bouton_commentaire.pack(anchor="w", pady=(2, 0))
+        bouton_commentaire.pack(anchor="w", pady=(3, 0))
         InfoBulle(bouton_commentaire, ligne["commentaire"] or "Aucun commentaire.")
         if not modifiable:
             bouton_commentaire.activer(False, "Le plan n'est plus modifiable.")
@@ -338,7 +413,7 @@ class VuePlanCharge(Vue):
         if texte is None:
             return
         cellule["commentaire"]["texte"] = texte
-        cellule["bouton_commentaire"].configure(text="commentaire ✓" if texte else "commentaire")
+        cellule["bouton_commentaire"].configure(text="Commentaire ✓" if texte else "Commentaire")
 
     def _lignes_saisies(self) -> list[dict]:
         return [

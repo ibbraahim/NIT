@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import tkinter as tk
 from datetime import date, timedelta
 from tkinter import ttk
 
-from app.gui.style import COULEURS
+import matplotlib.dates as mdates
+
+from app.gui.style import COULEURS, PUCE_STATUT
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampDate, ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
-from app.gui.widgets.graphique import GraphiqueIntegre, remplissage_degrade
+from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.services import admin, alertes, comparaison, kpi, recommandations
 from app.services.droits import a_le_droit
@@ -76,52 +77,50 @@ class VueComparaison(Vue):
     def construire(self) -> None:
         self.peut_comparer = a_le_droit(self.ctx, "UC20")
 
-        self.bandeau_derive = ttk.Frame(self.contenu, style="Derive.TFrame", padding=(10, 6))
+        self.bandeau_derive = ttk.Frame(self.contenu, style="Derive.TFrame", padding=(16, 10))
         self.label_derive = ttk.Label(
             self.bandeau_derive, text="", style="Derive.TLabel", wraplength=900
         )
         self.label_derive.pack(anchor="w")
-        self.bandeau_derive.pack(fill="x", pady=(0, 8))
+        self.bandeau_derive.pack(fill="x", pady=(0, self.ECART))
         self.bandeau_derive.pack_forget()
 
-        self._barre_filtres = ttk.Frame(self.contenu)
-        barre = self._barre_filtres
-        barre.pack(fill="x", pady=(0, 10))
-        self.site = ChampListe(barre, "Site", largeur=24)
+        carte_filtres = self.carte(marge=14)
+        self._barre_filtres = carte_filtres
+        barre = carte_filtres.zone
+        self.site = ChampListe(barre, "Site", largeur=22)
         self.site.pack(side="left")
         self.site.sur_changement(self._sur_changement_site)
-        self.zone = ChampListe(barre, "Zone", largeur=20)
+        self.zone = ChampListe(barre, "Zone", largeur=18)
         self.zone.pack(side="left", padx=(16, 0))
         self.zone.sur_changement(self.actualiser_donnees)
-
-        barre2 = ttk.Frame(self.contenu)
-        barre2.pack(fill="x", pady=(0, 10))
         aujourdhui = date.today()
-        self.date_debut = ChampDate(barre2, "Date de début")
+        self.date_debut = ChampDate(barre, "Date de début")
         self.date_debut.definir(aujourdhui - timedelta(days=27))
-        self.date_debut.pack(side="left")
+        self.date_debut.pack(side="left", padx=(16, 0))
         self.date_debut.sur_changement(self.actualiser_donnees)
-        self.date_fin = ChampDate(barre2, "Date de fin")
+        self.date_fin = ChampDate(barre, "Date de fin")
         self.date_fin.definir(aujourdhui - timedelta(days=1))
         self.date_fin.pack(side="left", padx=(16, 0))
         self.date_fin.sur_changement(self.actualiser_donnees)
 
-        boutons = ttk.Frame(barre2)
-        boutons.pack(side="left", padx=(24, 0), pady=(14, 0))
+        carte_graphique = self.carte("Réel contre prévisions", "Heures par jour sur la période")
+        boutons = carte_graphique.actions
         self.b_comparer = Bouton(boutons, "Lancer la comparaison", self.comparer, primaire=True)
         self.b_comparer.pack(side="left")
         if not self.peut_comparer:
             self.b_comparer.pack_forget()
         self.b_exporter = Bouton(boutons, "Exporter en Excel", self.exporter)
         self.b_exporter.pack(side="left", padx=(8, 0))
+        self.graphique = GraphiqueIntegre(carte_graphique.zone, largeur=9, hauteur=3)
+        self.graphique.pack(fill="both", expand=True)
 
-        self.graphique = GraphiqueIntegre(self.contenu, largeur=9, hauteur=3)
-        self.graphique.pack(fill="both", pady=(0, 10))
-
-        ttk.Label(self.contenu, text="Métriques par méthode", style="Section.TLabel").pack(
-            anchor="w", pady=(0, 4)
+        carte_metriques = self.carte(
+            "Métriques par méthode",
+            "Meilleure valeur en gras et en vert",
+            dernier=True,
         )
-        self.cadre_metriques = ttk.Frame(self.contenu, style="Carte.TFrame", padding=10)
+        self.cadre_metriques = ttk.Frame(carte_metriques.zone)
         self.cadre_metriques.pack(fill="x")
 
     def actualiser(self) -> None:
@@ -155,12 +154,10 @@ class VueComparaison(Vue):
         if not ouvertes:
             self.bandeau_derive.pack_forget()
             return
-        texte = " · ".join(
-            f"{'⛔' if a['niveau'] == 'rouge' else '⚠'} {a['message']}" for a in ouvertes
-        )
+        texte = " · ".join(f"{PUCE_STATUT} {a['message']}" for a in ouvertes)
         texte += f" — {recommandations.suggestion_alerte('derive_modele')}"
         self.label_derive.configure(text=texte)
-        self.bandeau_derive.pack(fill="x", pady=(0, 8), before=self._barre_filtres)
+        self.bandeau_derive.pack(fill="x", pady=(0, self.ECART), before=self._barre_filtres)
 
     def _periode(self) -> tuple[date, date] | None:
         try:
@@ -252,9 +249,10 @@ class VueComparaison(Vue):
                 label="Prévu (RN)",
             )
             axe.set_ylabel("Heures")
-            axe.legend(fontsize=8, loc="upper left")
-            axe.tick_params(axis="x", rotation=30, labelsize=7)
-            axe.set_title("Réel / RL / RN", fontsize=9, loc="left")
+            legende_en_haut(axe)
+            axe.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=10))
+            axe.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
+            axe.tick_params(axis="x", rotation=30, labelsize=8)
 
         self.graphique.dessiner(_dessiner)
 
@@ -268,27 +266,26 @@ class VueComparaison(Vue):
     def _construire_metriques(self, lignes_rl: list[dict], lignes_rn: list[dict]) -> None:
         for enfant in self.cadre_metriques.winfo_children():
             enfant.destroy()
-        fond = {"background": COULEURS["surface"]}
         for colonne, texte in enumerate(
             ("Métrique", "Régression linéaire (RL)", "Réseau de neurones (RN)")
         ):
-            tk.Label(self.cadre_metriques, text=texte, font=("", 10, "bold"), **fond).grid(
-                row=0, column=colonne, sticky="w", padx=(0, 24), pady=(0, 6)
+            ttk.Label(self.cadre_metriques, text=texte, style="KpiTitre.TLabel").grid(
+                row=0, column=colonne, sticky="w", padx=(0, 40), pady=(0, 8)
             )
         for ligne, (libelle_m, valeur_rl, valeur_rn, mode) in enumerate(
             _calculer_metriques(lignes_rl, lignes_rn), start=1
         ):
             gagnant = _meilleure_colonne(valeur_rl, valeur_rn, mode)
-            tk.Label(self.cadre_metriques, text=libelle_m, **fond).grid(
-                row=ligne, column=0, sticky="w", padx=(0, 24), pady=2
+            ttk.Label(self.cadre_metriques, text=libelle_m).grid(
+                row=ligne, column=0, sticky="w", padx=(0, 40), pady=3
             )
             for colonne, (cle, valeur) in enumerate(
                 (("rl", valeur_rl), ("rn", valeur_rn)), start=1
             ):
                 texte = formater_nombre(valeur, 2) if valeur is not None else "—"
-                police = ("", 10, "bold") if gagnant == cle else ("", 10)
-                tk.Label(self.cadre_metriques, text=texte, font=police, **fond).grid(
-                    row=ligne, column=colonne, sticky="w", padx=(0, 24), pady=2
+                style = "Gagnant.TLabel" if gagnant == cle else "TLabel"
+                ttk.Label(self.cadre_metriques, text=texte, style=style).grid(
+                    row=ligne, column=colonne, sticky="w", padx=(0, 40), pady=3
                 )
 
     def comparer(self) -> None:

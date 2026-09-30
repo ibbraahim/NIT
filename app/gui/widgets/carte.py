@@ -15,6 +15,8 @@ from app.gui.formes import coins_arrondis
 from app.gui.style import COULEURS
 
 RAYON_CARTE = 14
+#: Espace vertical entre deux cartes empilées.
+ECART_CARTES = 16
 
 
 class Carte(tk.Frame):
@@ -72,3 +74,20 @@ class Carte(tk.Frame):
                 self, image=coins[nom], borderwidth=0, highlightthickness=0, background=fond
             )
             coin.place(relx=x, rely=y, anchor=nom, bordermode="outside")
+
+
+def ajouter_carte(
+    parent: tk.Misc,
+    titre: str = "",
+    sous_titre: str = "",
+    marge: int = 18,
+    expand: bool = False,
+    dernier: bool = False,
+) -> Carte:
+    """Carte ajoutée en bas de ``parent`` (empilement vertical, pleine largeur) ; ``dernier``
+    supprime l'espace sous la carte et ``expand`` la laisse occuper la place restante."""
+    carte = Carte(parent, titre, sous_titre, marge=marge)
+    carte.pack(
+        fill="both" if expand else "x", expand=expand, pady=(0, 0 if dernier else ECART_CARTES)
+    )
+    return carte
