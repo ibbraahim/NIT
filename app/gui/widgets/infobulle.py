@@ -43,18 +43,18 @@ class InfoBulle:
         self._fenetre = tk.Toplevel(self.widget)
         self._fenetre.wm_overrideredirect(True)
         self._fenetre.wm_geometry(f"+{x}+{y}")
+        cadre = tk.Frame(self._fenetre, background=COULEURS["bordure"], highlightthickness=0)
+        cadre.pack()
         tk.Label(
-            self._fenetre,
+            cadre,
             text=self.texte,
             justify="left",
-            background="#ffffe8",
+            background=COULEURS["infobulle"],
             foreground=COULEURS["texte"],
-            relief="solid",
-            borderwidth=1,
             wraplength=360,
-            padx=6,
-            pady=4,
-        ).pack()
+            padx=8,
+            pady=5,
+        ).pack(padx=1, pady=1)
 
     def _masquer(self, _evenement=None) -> None:
         self._annuler()

@@ -6,27 +6,35 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
 
+#: Palette entièrement dérivée de l'identité Workly (voir COULEUR_FOND_MARQUE/ACCENT_*
+#: ci-dessous) : un fond légèrement teinté d'indigo, des bordures et une sélection dans la
+#: même famille de teintes que le dégradé de marque, et des couleurs de statut adoucies
+#: (moins saturées) pour rester en harmonie avec l'ensemble plutôt que de trancher dessus.
+#: Le sens des couleurs de statut (vert = bon, orange = attention, rouge = problème) est
+#: conservé tel quel : c'est un repère métier, pas une question d'identité visuelle.
 COULEURS = {
-    "primaire": "#1f4e79",
-    "primaire_clair": "#2f6aa3",
-    "primaire_fonce": "#163a5a",
-    "fond": "#f3f5f8",
+    "primaire": "#4C6CF0",
+    "primaire_clair": "#2FA8F5",
+    "primaire_fonce": "#33408F",
+    "fond": "#F5F6FC",
     "surface": "#ffffff",
-    "texte": "#1d2733",
-    "texte_secondaire": "#5f6b7a",
-    "bordure": "#c9d1dc",
-    "selection": "#d6e4f2",
-    "vert": "#2e7d32",
-    "vert_clair": "#e3f1e4",
-    "orange": "#e07b00",
-    "orange_clair": "#fdebd3",
-    "rouge": "#c62828",
-    "rouge_clair": "#f9dcdc",
-    "gris": "#8a8f98",
-    "gris_clair": "#eceff3",
-    "demo": "#fff1c2",
-    "demo_texte": "#6b4e00",
-    "desactive": "#a4acb6",
+    "texte": "#20264A",
+    "texte_secondaire": "#6C7293",
+    "bordure": "#DFE3F5",
+    "selection": "#E4E9FC",
+    "vert": "#3FA772",
+    "vert_clair": "#E4F5EC",
+    "orange": "#E2922E",
+    "orange_clair": "#FBEEDC",
+    "rouge": "#DD5A66",
+    "rouge_clair": "#FBE5E8",
+    "rouge_tres_clair": "#FDF1F2",
+    "gris": "#8890AC",
+    "gris_clair": "#EEF0F9",
+    "demo": "#FFF3D6",
+    "demo_texte": "#7A5B12",
+    "desactive": "#AEB4CB",
+    "infobulle": "#EEF1FE",
 }
 
 #: Identité de marque Workly : fond sombre réservé au bandeau, à l'écran de connexion, à
@@ -184,7 +192,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     )
 
     # Boutons
-    style.configure("TButton", padding=(10, 4), background=c["surface"])
+    style.configure("TButton", padding=(14, 7), background=c["surface"])
     style.map(
         "TButton",
         foreground=[("disabled", c["desactive"])],
@@ -216,7 +224,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     )
     style.configure(
         "Erreur.TEntry",
-        fieldbackground="#fff6f6",
+        fieldbackground=c["rouge_tres_clair"],
         bordercolor=c["rouge"],
         lightcolor=c["rouge"],
         darkcolor=c["rouge"],
@@ -226,13 +234,13 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
     style.configure(
         "Erreur.TCombobox", bordercolor=c["rouge"], lightcolor=c["rouge"], darkcolor=c["rouge"]
     )
-    style.map("Erreur.TCombobox", fieldbackground=[("readonly", "#fff6f6")])
+    style.map("Erreur.TCombobox", fieldbackground=[("readonly", c["rouge_tres_clair"])])
     style.configure(
         "Erreur.DateEntry",
         bordercolor=c["rouge"],
         lightcolor=c["rouge"],
         darkcolor=c["rouge"],
-        fieldbackground="#fff6f6",
+        fieldbackground=c["rouge_tres_clair"],
     )
     style.configure("TCheckbutton", background=c["fond"])
     style.configure("Carte.TCheckbutton", background=c["surface"])
@@ -240,7 +248,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
 
     # Onglets
     style.configure("TNotebook", background=c["fond"], borderwidth=0)
-    style.configure("TNotebook.Tab", padding=(14, 6))
+    style.configure("TNotebook.Tab", padding=(16, 8))
     style.map(
         "TNotebook.Tab",
         background=[("selected", c["surface"])],
@@ -252,14 +260,14 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         "Treeview",
         background=c["surface"],
         fieldbackground=c["surface"],
-        rowheight=24,
+        rowheight=27,
         bordercolor=c["bordure"],
     )
     style.configure(
         "Treeview.Heading",
         font=(famille, TAILLE_POLICE, "bold"),
         background=c["gris_clair"],
-        padding=(4, 4),
+        padding=(6, 6),
     )
     style.map(
         "Treeview",

@@ -243,7 +243,7 @@ class ChampTexteLong(ttk.Frame):
             relief="solid",
             borderwidth=1,
             highlightthickness=1,
-            highlightcolor="#2f6aa3",
+            highlightcolor=COULEURS["primaire_clair"],
         )
         self.saisie.grid(row=1, column=0, sticky="nsew", pady=(2, 0))
         self._aide = aide
@@ -260,11 +260,15 @@ class ChampTexteLong(ttk.Frame):
         self.saisie.insert("1.0", valeur or "")
 
     def signaler_erreur(self, message: str) -> None:
-        self.saisie.configure(highlightbackground="#c62828", highlightcolor="#c62828")
+        self.saisie.configure(
+            highlightbackground=COULEURS["rouge"], highlightcolor=COULEURS["rouge"]
+        )
         self.message.configure(text=message, style="Erreur.TLabel")
 
     def effacer_erreur(self) -> None:
-        self.saisie.configure(highlightbackground="#c9d1dc", highlightcolor="#2f6aa3")
+        self.saisie.configure(
+            highlightbackground=COULEURS["bordure"], highlightcolor=COULEURS["primaire_clair"]
+        )
         self.message.configure(text=self._aide, style="Aide.TLabel")
 
     def focus(self) -> None:
