@@ -127,8 +127,10 @@ class _BarreOnglets(tk.Canvas):
 class Onglets(ttk.Frame):
     """Barre de pilules + pages. S'utilise comme un ``ttk.Notebook`` (``add``, ``tabs``…)."""
 
-    def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, style="Page.TFrame")
+    def __init__(self, parent: tk.Misc, style: str = "Page.TFrame") -> None:
+        """``style`` : ``Page.TFrame`` sur le fond de page, ``TFrame`` dans une carte ou un
+        dialogue (fond de carte)."""
+        super().__init__(parent, style=style)
         self._notebook = ttk.Notebook(self, style="Plat.TNotebook")
         self._barre = _BarreOnglets(self, self._notebook)
         self._barre.pack(anchor="w", pady=(0, 16))

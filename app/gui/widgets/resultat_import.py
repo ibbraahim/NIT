@@ -16,6 +16,7 @@ from app.gui.widgets.dialogues import (
     choisir_fichier_a_enregistrer,
     informer,
 )
+from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.services import recommandations
 from app.services.donnees import exporter_rapport_erreurs
@@ -44,7 +45,7 @@ class DialogueResultatImport(DialogueBase):
             f"rejetée(s) · {len(resultat.avertissements)} avertissement(s)",
         ).pack(anchor="w", pady=(0, 8))
 
-        onglets = ttk.Notebook(self.corps)
+        onglets = Onglets(self.corps, style="TFrame")
         onglets.pack(fill="both", expand=True)
 
         cadre_valides = ttk.Frame(onglets, padding=8)

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +12,12 @@ from app.bd import connexion as bd
 from app.config import charger_configuration
 from app.erreurs import ErreurApplication
 from app.journal import configurer_journal
+
+# Les tests ne doivent ni lire ni écrire les préférences réelles de l'utilisateur (thème) :
+# fichier temporaire recréé à chaque session, avant toute importation de ``app.gui``.
+_PREFERENCES_TESTS = Path(tempfile.gettempdir()) / "workly_preferences_tests.json"
+_PREFERENCES_TESTS.unlink(missing_ok=True)
+os.environ["WORKLY_PREFERENCES"] = str(_PREFERENCES_TESTS)
 
 MOT_DE_PASSE_ADMIN = "Admin2026!"
 

@@ -91,6 +91,7 @@ class FenetreAPropos(DialogueBase):
             width=96,
             height=28,
             wrap="word",
+            font="TkDefaultFont",
             relief="flat",
             background="#111a3d",
             foreground="#e8ebf5",

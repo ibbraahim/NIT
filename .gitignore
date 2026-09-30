@@ -12,3 +12,6 @@ entrees/traites/*
 ressources/images/degrades/*
 ressources/images/icones/*
 !**/.gitkeep
+
+# Préférences d'interface (thème) propres au poste
+preferences.json

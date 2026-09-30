@@ -581,4 +581,7 @@ def appliquer_style(racine: tk.Tk) -> ttk.Style:
         darkcolor=COULEUR_ACCENT_3,
         thickness=8,
     )
+    from app.gui.indicateurs import creer_indicateurs
+
+    creer_indicateurs(racine, style)
     return style

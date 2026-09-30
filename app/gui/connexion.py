@@ -10,7 +10,8 @@ from app import ACCROCHE, NOM_APPLICATION, VERSION
 from app.config import DOSSIER_IMAGES
 from app.contexte import Contexte
 from app.erreurs import ErreurApplication
-from app.gui.degrades import image_lueur_radiale, melanger
+from app.gui.degrades import melanger
+from app.gui.formes import image_arrondie, lueur_radiale, photo, rectangle_arrondi
 from app.gui.style import COULEUR_ACCENT_4, COULEUR_FOND_MARQUE, COULEUR_FOND_MARQUE_PROFOND
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampTexte
@@ -30,17 +31,18 @@ class EcranConnexion(ttk.Frame):
         super().__init__(parent, style="Marque.TFrame")
         self.sur_connexion = sur_connexion
 
-        centre_lueur = melanger(COULEUR_ACCENT_4, COULEUR_FOND_MARQUE_PROFOND, 0.45)
-        chemin_fond = image_lueur_radiale(1400, 850, centre_lueur, COULEUR_FOND_MARQUE_PROFOND)
-        self._fond = tk.PhotoImage(file=str(chemin_fond))
-        tk.Label(
-            self, image=self._fond, background=COULEUR_FOND_MARQUE_PROFOND, borderwidth=0
-        ).place(x=0, y=0, relwidth=1, relheight=1)
+        self._canevas = tk.Canvas(
+            self, highlightthickness=0, borderwidth=0, background=COULEUR_FOND_MARQUE_PROFOND
+        )
+        self._canevas.pack(fill="both", expand=True)
+        carte = ttk.Frame(self._canevas, style="Marque.TFrame")
+        self._carte = carte
 
-        carte = ttk.Frame(self, style="Marque.TFrame", padding=32)
-        carte.place(relx=0.5, rely=0.45, anchor="center")
-
-        self._logo = tk.PhotoImage(file=str(DOSSIER_IMAGES / "logo_workly_88.png"))
+        self._logo = photo(
+            self._canevas,
+            ("connexion-logo",),
+            lambda: image_arrondie(str(DOSSIER_IMAGES / "logo_workly_88.png"), 76, 19),
+        )
         ttk.Label(carte, image=self._logo, background=COULEUR_FOND_MARQUE).grid(
             row=0, column=0, columnspan=2, pady=(0, 12)
         )
@@ -72,6 +74,39 @@ class EcranConnexion(ttk.Frame):
         for champ in (self.identifiant, self.mot_de_passe):
             champ.saisie.bind("<Return>", lambda _e: self.se_connecter())
         self.identifiant.focus()
+        self._canevas.bind("<Configure>", self._dessiner)
+
+    def _dessiner(self, _evenement=None) -> None:
+        """Halo de fond à la taille de la fenêtre, carte arrondie centrée derrière le formulaire."""
+        largeur, hauteur = self._canevas.winfo_width(), self._canevas.winfo_height()
+        if largeur < 50 or hauteur < 50:
+            return
+        self._canevas.delete("all")
+        centre_lueur = melanger(COULEUR_ACCENT_4, COULEUR_FOND_MARQUE_PROFOND, 0.45)
+        fond = photo(
+            self._canevas,
+            ("connexion-fond", largeur, hauteur),
+            lambda: lueur_radiale(largeur, hauteur, centre_lueur, COULEUR_FOND_MARQUE_PROFOND),
+        )
+        self._canevas.create_image(0, 0, anchor="nw", image=fond)
+        self._carte.update_idletasks()
+        marge = 36
+        largeur_carte = self._carte.winfo_reqwidth() + 2 * marge
+        hauteur_carte = self._carte.winfo_reqheight() + 2 * marge
+        fond_carte = photo(
+            self._canevas,
+            ("connexion-carte", largeur_carte, hauteur_carte),
+            lambda: rectangle_arrondi(
+                largeur_carte,
+                hauteur_carte,
+                24,
+                (COULEUR_FOND_MARQUE,),
+                bordure=melanger(COULEUR_ACCENT_4, COULEUR_FOND_MARQUE, 0.75),
+            ),
+        )
+        centre_x, centre_y = largeur / 2, hauteur * 0.46
+        self._canevas.create_image(centre_x, centre_y, image=fond_carte)
+        self._canevas.create_window(centre_x, centre_y, window=self._carte)
 
     def se_connecter(self) -> None:
         """UC01 : vérifie les champs puis authentifie l'utilisateur."""

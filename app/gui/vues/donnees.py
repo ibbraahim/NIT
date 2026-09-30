@@ -291,7 +291,7 @@ class OngletHistorique(OngletSaisieImport):
         Colonne("commandes_a_temps", "Commandes à temps", 130, "e"),
         Colonne("commandes_totales", "Commandes totales", 130, "e"),
         Colonne("indicateur_pic", "Pic", 60, "center"),
-        Colonne("source", "Origine", 140, formateur=_formateur_source),
+        Colonne("source", "Origine", 190, formateur=_formateur_source),
     ]
 
     def actualiser_tableau(self) -> None:
@@ -333,7 +333,7 @@ class OngletPrevisions(OngletSaisieImport):
         Colonne("date_jour", "Date", 100, "center"),
         Colonne("volume_prevu", "Volume demandé", 120, "e"),
         Colonne("indicateur_pic", "Pic annoncé", 100, "center"),
-        Colonne("source", "Origine", 140, formateur=_formateur_source),
+        Colonne("source", "Origine", 190, formateur=_formateur_source),
     ]
 
     def effacer_formulaire(self) -> None:

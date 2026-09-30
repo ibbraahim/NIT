@@ -12,15 +12,22 @@ from pathlib import Path
 from tkinter import filedialog, ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication
-from app.gui.style import COULEURS, a_chaque_theme
+from app.gui.formes import badge_icone, photo
+from app.gui.style import COULEURS, COULEURS_STATUT_CLAIR, a_chaque_theme
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import appliquer_erreurs
 from app.journal import journal
 
 _log = journal(__name__)
 
-ICONES = {"information": "ℹ", "question": "?", "erreur": "✖", "avertissement": "⚠"}
+ICONES = {
+    "information": "info",
+    "question": "question",
+    "erreur": "erreur",
+    "avertissement": "avertissement",
+}
 COULEURS_ICONES: dict[str, str] = {}
+FONDS_ICONES: dict[str, str] = {}
 
 
 @a_chaque_theme
@@ -31,6 +38,14 @@ def _couleurs_icones() -> None:
             "question": COULEURS["primaire"],
             "erreur": COULEURS["rouge"],
             "avertissement": COULEURS["orange"],
+        }
+    )
+    FONDS_ICONES.update(
+        {
+            "information": COULEURS["selection"],
+            "question": COULEURS["selection"],
+            "erreur": COULEURS_STATUT_CLAIR["rouge"],
+            "avertissement": COULEURS_STATUT_CLAIR["orange"],
         }
     )
 
@@ -103,12 +118,23 @@ class DialogueMessage(DialogueBase):
         details: str = "",
     ) -> None:
         super().__init__(parent, titre)
-        ttk.Label(
+        icone, couleur, fond = (
+            ICONES.get(genre, "info"),
+            COULEURS_ICONES.get(genre),
+            FONDS_ICONES.get(genre),
+        )
+        badge = photo(
+            self,
+            ("dialogue-icone", icone, couleur, fond),
+            lambda: badge_icone(icone, couleur, fond, 48),
+        )
+        tk.Label(
             self.corps,
-            text=ICONES.get(genre, ""),
-            font=("", 22, "bold"),
-            foreground=COULEURS_ICONES.get(genre),
-        ).grid(row=0, column=0, sticky="n", padx=(0, 14))
+            image=badge,
+            borderwidth=0,
+            highlightthickness=0,
+            background=COULEURS["surface"],
+        ).grid(row=0, column=0, sticky="n", padx=(0, 16))
         ttk.Label(self.corps, text=message, wraplength=440, justify="left").grid(
             row=0, column=1, sticky="w"
         )

@@ -239,7 +239,41 @@ def _plus(c: _Crayon) -> None:
     c.ligne((5, 12), (19, 12))
 
 
+def _coche(c: _Crayon) -> None:
+    c.ligne((6.2, 12.6), (10.4, 16.8), (17.8, 7.6))
+
+
+def _info(c: _Crayon) -> None:
+    c.cercle(12, 12, 9)
+    c.ligne((12, 11), (12, 16.5))
+    c.cercle(12, 7.6, 1.1, plein=True)
+
+
+def _question(c: _Crayon) -> None:
+    c.cercle(12, 12, 9)
+    c.arc(9.2, 7.2, 14.8, 12.8, 190, 420)
+    c.ligne((12, 12.6), (12, 14))
+    c.cercle(12, 16.9, 1.1, plein=True)
+
+
+def _erreur(c: _Crayon) -> None:
+    c.cercle(12, 12, 9)
+    c.ligne((8.6, 8.6), (15.4, 15.4))
+    c.ligne((15.4, 8.6), (8.6, 15.4))
+
+
+def _avertissement(c: _Crayon) -> None:
+    c.ligne((12, 3.6), (21.4, 19.8), (2.6, 19.8), (12, 3.6))
+    c.ligne((12, 9.6), (12, 14.2))
+    c.cercle(12, 16.9, 1.0, plein=True)
+
+
 _DESSINS = {
+    "coche": _coche,
+    "info": _info,
+    "question": _question,
+    "erreur": _erreur,
+    "avertissement": _avertissement,
     "tableau_bord": _tableau_bord,
     "donnees": _donnees,
     "previsions": _previsions,

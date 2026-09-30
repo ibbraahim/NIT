@@ -176,3 +176,33 @@ def carte_hero(
         couverture = np.clip(r - np.hypot(x + 0.5 - cx, y + 0.5 - cy) + 0.5, 0, 1) * opacite
         base[..., :3] = base[..., :3] * (1 - couverture[..., None]) + 255 * couverture[..., None]
     return Image.fromarray(base.astype("uint8"), "RGBA")
+
+
+def badge_icone(nom: str, couleur: str, fond: str, taille: int = 48) -> Image.Image:
+    """Pastille ronde teintée (``fond``) portant l'icône d'interface ``nom`` de ``couleur``."""
+    from app.gui.icones import icone_interface
+
+    base = rectangle_arrondi(taille, taille, taille / 2, (fond,))
+    icone = icone_interface(nom, couleur, round(taille * 0.54))
+    base.alpha_composite(icone, ((taille - icone.width) // 2, (taille - icone.height) // 2))
+    return base
+
+
+@lru_cache(maxsize=8)
+def lueur_radiale(
+    largeur: int,
+    hauteur: int,
+    couleur_centre: str,
+    couleur_bord: str,
+    centre_relatif: tuple[float, float] = (0.5, 0.4),
+) -> Image.Image:
+    """Halo de lumière : ``couleur_centre`` au point ``centre_relatif`` (proportions de la
+    largeur et de la hauteur), fondue en ``couleur_bord`` vers les coins. Fond de l'écran de
+    connexion, calculé à la taille exacte de la fenêtre."""
+    y, x = np.mgrid[0:hauteur, 0:largeur]
+    distance = np.hypot(x - centre_relatif[0] * largeur, y - centre_relatif[1] * hauteur)
+    t = np.clip(distance / (distance.max() * 0.85), 0, 1)[..., None]
+    t = t * t * (3 - 2 * t)
+    centre = np.array(hex_vers_rgb(couleur_centre), dtype=float)
+    bord = np.array(hex_vers_rgb(couleur_bord), dtype=float)
+    return Image.fromarray((centre * (1 - t) + bord * t).astype("uint8"), "RGB")

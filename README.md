@@ -80,6 +80,21 @@ leurs formules exactes sont catalogués dans `app/bd/catalogue_kpi.py` ; les cho
 non explicitement fixés par l'énoncé sont documentés dans `docs/plan.md` (section « Questions et
 points discutables »).
 
+## Apparence
+
+Deux thèmes : **sombre** (par défaut, dans l'esprit de la marque) et **clair**. Le bouton
+soleil / lune de l'en-tête bascule de l'un à l'autre, et le choix est mémorisé dans
+`preferences.json` (fichier local, non versionné).
+
+Tkinter ne sait ni arrondir un cadre, ni peindre un dégradé, ni porter une ombre : les cartes à
+coins arrondis, les boutons en pilule, les pastilles de statut, les icônes, les cases à cocher
+et les cartes d'indicateurs en dégradé sont de petites images générées avec PIL
+(`app/gui/formes.py`, `app/gui/icones.py`, `app/gui/indicateurs.py`) aux couleurs du thème
+courant ; la palette des deux thèmes est définie dans `app/gui/style.py` et les widgets de
+l'interface (carte, navigation, onglets en pilules, cartes d'indicateurs, tracés) dans
+`app/gui/widgets/`. Les graphiques (anneau, jauge, barres arrondies, aires en dégradé) sont
+tracés avec matplotlib dans ces mêmes couleurs.
+
 ## Tâches automatiques
 
 Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches

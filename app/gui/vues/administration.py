@@ -12,6 +12,7 @@ from app.erreurs import DonneesInvalides, ErreurApplication
 from app.gui.style import COULEURS
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
+from app.gui.widgets.carte import Carte, ajouter_carte
 from app.gui.widgets.champs import ChampCase, ChampDate, ChampListe, ChampNombre, ChampTexte
 from app.gui.widgets.dialogues import (
     DialogueBase,
@@ -20,6 +21,7 @@ from app.gui.widgets.dialogues import (
     confirmer,
     informer,
 )
+from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import (
@@ -69,7 +71,7 @@ class VueAdministration(Vue):
     sous_titre = "Référentiels, utilisateurs et tâches automatiques"
 
     def construire(self) -> None:
-        self.onglets = ttk.Notebook(self.contenu)
+        self.onglets = Onglets(self.contenu)
         self.onglets.pack(fill="both", expand=True)
         self.pages = []
         for classe, titre in self._pages():
@@ -97,7 +99,7 @@ class Onglet(ttk.Frame):
     """Page d'onglet ayant accès à la vue parente."""
 
     def __init__(self, parent, vue: VueAdministration) -> None:
-        super().__init__(parent, padding=12)
+        super().__init__(parent, style="Page.TFrame")
         self.vue = vue
         self.ctx = vue.ctx
         self.construire()
@@ -108,10 +110,16 @@ class Onglet(ttk.Frame):
     def actualiser(self) -> None:
         """Recharge les données de l'onglet."""
 
-    def barre_boutons(self) -> ttk.Frame:
-        barre = ttk.Frame(self)
-        barre.pack(fill="x", pady=(0, 8))
-        return barre
+    def carte(
+        self,
+        titre: str = "",
+        sous_titre: str = "",
+        marge: int = 18,
+        expand: bool = False,
+        dernier: bool = False,
+    ) -> Carte:
+        """Carte ajoutée en bas de la page ; ses boutons d'action vont dans ``carte.actions``."""
+        return ajouter_carte(self, titre, sous_titre, marge, expand, dernier)
 
 
 # =====================================================================
@@ -121,22 +129,23 @@ class OngletSitesZones(Onglet):
     """Boutons : « Ajouter un site », « Ajouter une zone », « Modifier », « Désactiver »."""
 
     def construire(self) -> None:
-        barre = self.barre_boutons()
+        carte = self.carte("Sites et zones", "Double-clic pour modifier", dernier=True)
+        barre = carte.actions
         self.b_site = Bouton(barre, "Ajouter un site", self.ajouter_site, primaire=True)
         self.b_zone = Bouton(barre, "Ajouter une zone", self.ajouter_zone)
         self.b_modifier = Bouton(barre, "Modifier", self.modifier)
         self.b_desactiver = Bouton(barre, "Désactiver", self.desactiver)
         for bouton in (self.b_site, self.b_zone, self.b_modifier, self.b_desactiver):
-            bouton.pack(side="left", padx=(0, 8))
+            bouton.pack(side="left", padx=(8, 0))
         self.tableau = TableauTriable(
-            self,
+            carte.zone,
             [
                 Colonne("type_libelle", "Type d'équipement principal", 230),
                 Colonne("duree", "Durée de poste (h)", 150, "e"),
                 Colonne("adresse", "Adresse", 320),
                 Colonne("etat", "État", 90),
             ],
-            hauteur=18,
+            hauteur=16,
             arborescence=True,
             titre_arbre="Site / zone",
             largeur_arbre=260,
@@ -327,21 +336,21 @@ class OngletEquipements(Onglet):
     """Boutons : « Ajouter », « Modifier », « Déclarer une indisponibilité… », « Désactiver »."""
 
     def construire(self) -> None:
-        haut = ttk.Frame(self)
-        haut.pack(fill="x", pady=(0, 8))
-        self.site = ChampListe(haut, "Site", largeur=30)
+        haut = self.carte(marge=14).zone
+        self.site = ChampListe(haut, "Site", largeur=26)
         self.site.pack(side="left")
         self.site.sur_changement(self.actualiser)
         barre = ttk.Frame(haut)
-        barre.pack(side="left", padx=(24, 0), pady=(14, 0))
+        barre.pack(side="right", pady=(16, 0))
         self.b_ajouter = Bouton(barre, "Ajouter", self.ajouter, primaire=True)
         self.b_modifier = Bouton(barre, "Modifier", self.modifier)
         self.b_indispo = Bouton(barre, "Déclarer une indisponibilité…", self.declarer)
         self.b_desactiver = Bouton(barre, "Désactiver", self.desactiver)
         for bouton in (self.b_ajouter, self.b_modifier, self.b_indispo, self.b_desactiver):
-            bouton.pack(side="left", padx=(0, 8))
+            bouton.pack(side="left", padx=(8, 0))
+        carte_eqp = self.carte("Équipements", "Double-clic pour modifier")
         self.tableau = TableauTriable(
-            self,
+            carte_eqp.zone,
             [
                 Colonne("code", "Code", 90),
                 Colonne("type_libelle", "Type", 190),
@@ -350,16 +359,14 @@ class OngletEquipements(Onglet):
                 Colonne("etat", "État", 80),
                 Colonne("prochaine_indisponibilite", "Prochaine indisponibilité", 170, "center"),
             ],
-            hauteur=11,
+            hauteur=9,
         )
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self.mettre_a_jour_boutons)
         self.tableau.sur_double_clic(lambda _l: self.modifier())
-        ttk.Label(self, text="Indisponibilités en cours et à venir", style="Section.TLabel").pack(
-            anchor="w", pady=(12, 4)
-        )
+        carte_indispos = self.carte("Indisponibilités en cours et à venir", dernier=True)
         self.indispos = TableauTriable(
-            self,
+            carte_indispos.zone,
             [
                 Colonne("code", "Équipement", 110),
                 Colonne("zone", "Zone", 140),
@@ -530,47 +537,46 @@ class OngletCapacitesCouts(Onglet):
     """
 
     def construire(self) -> None:
-        haut = ttk.Frame(self)
-        haut.pack(fill="x", pady=(0, 8))
-        self.site = ChampListe(haut, "Site", largeur=30)
+        haut = self.carte(marge=14).zone
+        self.site = ChampListe(haut, "Site", largeur=26)
         self.site.pack(side="left")
         self.site.sur_changement(self.charger_grille)
         self.semaine = ChampDate(haut, "Semaine du")
         self.semaine.pack(side="left", padx=(16, 0))
         self.semaine.sur_changement(self.charger_grille)
         barre = ttk.Frame(haut)
-        barre.pack(side="left", padx=(24, 0), pady=(14, 0))
+        barre.pack(side="right", pady=(16, 0))
         self.b_enregistrer = Bouton(barre, "Enregistrer", self.enregistrer, primaire=True)
         self.b_copier = Bouton(barre, "Copier la semaine précédente", self.copier)
         self.b_enregistrer.pack(side="left", padx=(0, 8))
         self.b_copier.pack(side="left")
 
-        ttk.Label(
-            self,
-            text="Capacité de personnel planifiée (effectif / absences prévues, en " "personnes)",
-            style="Section.TLabel",
-        ).pack(anchor="w", pady=(4, 4))
-        self.grille = ttk.Frame(self, style="Carte.TFrame", padding=8)
-        self.grille.pack(fill="x")
-        self.message_grille = ttk.Label(self, text="", style="Erreur.TLabel", wraplength=900)
-        self.message_grille.pack(anchor="w", pady=(4, 0))
-
-        ttk.Label(self, text="Coûts horaires", style="Section.TLabel").pack(
-            anchor="w", pady=(14, 4)
+        carte_grille = self.carte(
+            "Capacité de personnel planifiée", "Effectif / absences prévues, en personnes"
         )
-        couts = ttk.Frame(self, style="Carte.TFrame", padding=8)
+        self.grille = ttk.Frame(carte_grille.zone)
+        self.grille.pack(fill="x")
+        self.message_grille = ttk.Label(
+            carte_grille.zone, text="", style="Erreur.TLabel", wraplength=900
+        )
+        self.message_grille.pack(anchor="w", pady=(6, 0))
+
+        carte_couts = self.carte(
+            "Coûts horaires", "Taux par catégorie, applicables à partir d'une date", dernier=True
+        )
+        couts = ttk.Frame(carte_couts.zone)
         couts.pack(fill="x")
         self.champs_couts: dict[str, ChampNombre] = {}
         for colonne, (categorie, texte) in enumerate(CATEGORIES_COUT.items()):
-            champ = ChampNombre(couts, f"{texte} (taux horaire)", style_cadre="Carte.TFrame")
+            champ = ChampNombre(couts, f"{texte} (taux horaire)")
             champ.grid(row=0, column=colonne, sticky="w", padx=(0, 18))
             self.champs_couts[categorie] = champ
-        self.devise = ChampTexte(couts, "Devise", largeur=6, style_cadre="Carte.TFrame")
+        self.devise = ChampTexte(couts, "Devise", largeur=6)
         self.devise.grid(row=0, column=3, sticky="w", padx=(0, 18))
-        self.date_effet = ChampDate(couts, "Applicable à partir du", style_cadre="Carte.TFrame")
+        self.date_effet = ChampDate(couts, "Applicable à partir du")
         self.date_effet.grid(row=0, column=4, sticky="w")
         self.historique_couts = TableauTriable(
-            self,
+            carte_couts.zone,
             [
                 Colonne("categorie_libelle", "Catégorie", 220),
                 Colonne(
@@ -581,7 +587,7 @@ class OngletCapacitesCouts(Onglet):
             ],
             hauteur=5,
         )
-        self.historique_couts.pack(fill="both", expand=True, pady=(8, 0))
+        self.historique_couts.pack(fill="both", expand=True, pady=(14, 0))
         self.cellules: dict[tuple[int, date], tuple[tk.StringVar, tk.StringVar, list]] = {}
         self._couts_actuels: dict[str, float] = {}
 
@@ -614,41 +620,33 @@ class OngletCapacitesCouts(Onglet):
         zones = self.vue.executer(lambda: admin.lister_zones(self.ctx, site_id)) or []
         capacites = self.vue.executer(lambda: admin.lire_capacites(self.ctx, site_id, lundi)) or {}
         jours = jours_semaine(lundi)
-        ttk.Label(self.grille, text="Zone", style="Gras.TLabel", background="#ffffff").grid(
+        ttk.Label(self.grille, text="Zone", style="KpiTitre.TLabel").grid(
             row=0, column=0, sticky="w", padx=(0, 10)
         )
         for c, jour in enumerate(jours, start=1):
-            ttk.Label(
-                self.grille,
-                text=formater_jour_court(jour),
-                style="Gras.TLabel",
-                background="#ffffff",
-            ).grid(row=0, column=c, padx=6)
-            ttk.Label(
-                self.grille, text="eff. / abs.", style="Aide.TLabel", background="#ffffff"
-            ).grid(row=1, column=c)
+            ttk.Label(self.grille, text=formater_jour_court(jour), style="KpiTitre.TLabel").grid(
+                row=0, column=c, padx=6
+            )
+            ttk.Label(self.grille, text="eff. / abs.", style="Aide.TLabel").grid(row=1, column=c)
         for r, zone in enumerate(zones, start=2):
-            ttk.Label(self.grille, text=zone["nom"], background="#ffffff").grid(
-                row=r, column=0, sticky="w", padx=(0, 10), pady=2
+            ttk.Label(self.grille, text=zone["nom"], style="Gras.TLabel").grid(
+                row=r, column=0, sticky="w", padx=(0, 10), pady=3
             )
             for c, jour in enumerate(jours, start=1):
                 existant = capacites.get((zone["id"], jour), {})
-                cadre = ttk.Frame(self.grille, style="Surface.TFrame")
-                cadre.grid(row=r, column=c, padx=6, pady=2)
+                cadre = ttk.Frame(self.grille)
+                cadre.grid(row=r, column=c, padx=6, pady=3)
                 eff = tk.StringVar(value=str(existant.get("effectif_planifie", "")))
                 abs_ = tk.StringVar(value=str(existant.get("absences_prevues", "")))
                 e1 = ttk.Entry(cadre, textvariable=eff, width=4, justify="right")
                 e2 = ttk.Entry(cadre, textvariable=abs_, width=3, justify="right")
                 e1.pack(side="left")
-                ttk.Label(cadre, text="/", background="#ffffff").pack(side="left", padx=1)
+                ttk.Label(cadre, text="/").pack(side="left", padx=1)
                 e2.pack(side="left")
                 self.cellules[(zone["id"], jour)] = (eff, abs_, [e1, e2])
         if not zones:
             ttk.Label(
-                self.grille,
-                text="Aucune zone active pour ce site.",
-                style="Aide.TLabel",
-                background="#ffffff",
+                self.grille, text="Aucune zone active pour ce site.", style="Aide.TLabel"
             ).grid(row=2, column=0, columnspan=8, sticky="w")
 
     def charger_couts(self) -> None:
@@ -764,7 +762,8 @@ class OngletUtilisateurs(Onglet):
     mot de passe »."""
 
     def construire(self) -> None:
-        barre = self.barre_boutons()
+        carte = self.carte("Utilisateurs", "Double-clic pour modifier", dernier=True)
+        barre = carte.actions
         self.b_ajouter = Bouton(barre, "Ajouter", self.ajouter, primaire=True)
         self.b_modifier = Bouton(barre, "Modifier", self.modifier)
         self.b_activer = Bouton(barre, "Désactiver / Réactiver", self.activer_desactiver)
@@ -772,18 +771,18 @@ class OngletUtilisateurs(Onglet):
             barre, "Réinitialiser le mot de passe", self.reinitialiser_mot_de_passe
         )
         for bouton in (self.b_ajouter, self.b_modifier, self.b_activer, self.b_reinitialiser):
-            bouton.pack(side="left", padx=(0, 8))
+            bouton.pack(side="left", padx=(8, 0))
         self.tableau = TableauTriable(
-            self,
+            carte.zone,
             [
                 Colonne("identifiant", "Identifiant", 130),
                 Colonne("nom_complet", "Nom", 200),
                 Colonne("email", "E-mail", 200),
-                Colonne("role_libelle", "Rôle", 170),
+                Colonne("role_libelle", "Rôle", 210),
                 Colonne("sites_affiches", "Sites", 220),
                 Colonne("etat", "État", 90),
             ],
-            hauteur=18,
+            hauteur=16,
         )
         self.tableau.pack(fill="both", expand=True)
         self.tableau.sur_selection(self.mettre_a_jour_boutons)
@@ -980,25 +979,28 @@ class OngletTaches(Onglet):
     « Suspendre le planificateur », « Voir le journal »."""
 
     def construire(self) -> None:
-        barre = self.barre_boutons()
-        self.b_executer = Bouton(
-            barre, "Exécuter la tâche sélectionnée", self.executer, primaire=True
-        )
-        self.b_executer.pack(side="left")
-        self.b_executer.activer(False, "Sélectionnez d'abord une tâche.")
-
-        barre2 = ttk.Frame(self)
-        barre2.pack(fill="x", pady=(0, 8))
+        carte_etat = self.carte("Planificateur", "Exécution automatique des tâches")
+        self.etat_planificateur = ttk.Label(carte_etat.zone, text="", style="Gras.TLabel")
+        self.etat_planificateur.pack(anchor="w", pady=(0, 10))
+        barre2 = ttk.Frame(carte_etat.zone)
+        barre2.pack(fill="x")
         self.b_demarrer = Bouton(barre2, "Démarrer le planificateur", self.demarrer)
         self.b_suspendre = Bouton(barre2, "Suspendre le planificateur", self.suspendre)
         self.b_journal = Bouton(barre2, "Voir le journal", self.voir_journal)
         for bouton in (self.b_demarrer, self.b_suspendre, self.b_journal):
             bouton.pack(side="left", padx=(0, 8))
-        self.etat_planificateur = ttk.Label(self, text="", style="Section.TLabel")
-        self.etat_planificateur.pack(anchor="w", pady=(4, 8))
+
+        carte = self.carte(
+            "Tâches automatiques", "Sélectionnez une tâche pour l'exécuter maintenant", dernier=True
+        )
+        self.b_executer = Bouton(
+            carte.actions, "Exécuter la tâche sélectionnée", self.executer, primaire=True
+        )
+        self.b_executer.pack(side="left")
+        self.b_executer.activer(False, "Sélectionnez d'abord une tâche.")
 
         self.tableau = TableauTriable(
-            self,
+            carte.zone,
             [
                 Colonne("tache_libelle", "Tâche", 320),
                 Colonne("frequence", "Fréquence", 190),
