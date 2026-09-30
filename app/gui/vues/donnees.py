@@ -32,10 +32,10 @@ def _formateur_source(valeur):
 
 
 class VueDonnees(Vue):
-    """Onglets « Historique d'activité » et « Prévisions de volume »."""
+    """Onglets « Historique d'activité » et « Demande client »."""
 
     titre = "Données"
-    sous_titre = "Historique d'activité et prévisions de volume"
+    sous_titre = "Historique d'activité et demande client"
 
     def construire(self) -> None:
         self.onglets = ttk.Notebook(self.contenu)
@@ -43,7 +43,7 @@ class VueDonnees(Vue):
         self.page_historique = OngletHistorique(self.onglets, self)
         self.onglets.add(self.page_historique, text="Historique d'activité")
         self.page_previsions = OngletPrevisions(self.onglets, self)
-        self.onglets.add(self.page_previsions, text="Prévisions de volume")
+        self.onglets.add(self.page_previsions, text="Demande client")
 
     def actualiser(self) -> None:
         self.page_historique.actualiser()
@@ -311,23 +311,25 @@ class OngletHistorique(OngletSaisieImport):
 
 
 class OngletPrevisions(OngletSaisieImport):
-    """Onglet « Prévisions de volume »."""
+    """Onglet « Demande client » (UC05) : la demande annoncée par le client, saisie ou
+    importée par site, zone et date, sert directement de base au calcul des ressources
+    nécessaires (UC11)."""
 
     type_donnees = "prevision"
     specs = CHAMPS_PREVISION
-    libelle_type = "les prévisions de volume"
-    titre_tableau = "Prévisions saisies (28 prochains jours)"
+    libelle_type = "la demande client"
+    titre_tableau = "Demande client saisie (28 prochains jours)"
     colonnes_import = [
         Colonne("site", "Site", 150),
         Colonne("zone", "Zone", 120),
         Colonne("date", "Date", 100, "center"),
-        Colonne("volume_prevu", "Volume prévu", 110, "e"),
+        Colonne("volume_prevu", "Volume demandé", 110, "e"),
     ]
     colonnes_tableau = [
         Colonne("site", "Site", 150),
         Colonne("zone", "Zone", 120),
         Colonne("date_jour", "Date", 100, "center"),
-        Colonne("volume_prevu", "Volume prévu", 120, "e"),
+        Colonne("volume_prevu", "Volume demandé", 120, "e"),
         Colonne("indicateur_pic", "Pic annoncé", 100, "center"),
         Colonne("source", "Origine", 140, formateur=_formateur_source),
     ]

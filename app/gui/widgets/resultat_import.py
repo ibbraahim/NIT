@@ -17,6 +17,7 @@ from app.gui.widgets.dialogues import (
     informer,
 )
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
+from app.services import recommandations
 from app.services.donnees import exporter_rapport_erreurs
 from app.services.qualite import ResultatControleQualite
 
@@ -58,19 +59,26 @@ class DialogueResultatImport(DialogueBase):
 
         cadre_rejets = ttk.Frame(onglets, padding=8)
         onglets.add(cadre_rejets, text=f"Rejets ({len(resultat.rejets)})")
-        tableau_rejets = TableauTriable(
+        self.tableau_rejets = tableau_rejets = TableauTriable(
             cadre_rejets,
             [
                 Colonne("ligne", "Ligne", 70, "e"),
-                Colonne("colonne", "Colonne", 200),
-                Colonne("raison", "Raison", 500),
+                Colonne("colonne", "Colonne", 160),
+                Colonne("raison", "Raison", 380),
+                Colonne("suggestion", "Suggestion", 380),
             ],
             hauteur=14,
         )
         tableau_rejets.pack(fill="both", expand=True)
         tableau_rejets.charger(
             [
-                {"_id": i, "ligne": r.ligne, "colonne": r.colonne, "raison": r.raison}
+                {
+                    "_id": i,
+                    "ligne": r.ligne,
+                    "colonne": r.colonne,
+                    "raison": r.raison,
+                    "suggestion": recommandations.suggestion_rejet(r.colonne, r.raison),
+                }
                 for i, r in enumerate(resultat.rejets)
             ],
             cle_id="_id",
@@ -80,19 +88,26 @@ class DialogueResultatImport(DialogueBase):
 
         cadre_avert = ttk.Frame(onglets, padding=8)
         onglets.add(cadre_avert, text=f"Avertissements ({len(resultat.avertissements)})")
-        tableau_avert = TableauTriable(
+        self.tableau_avert = tableau_avert = TableauTriable(
             cadre_avert,
             [
                 Colonne("ligne", "Ligne", 70, "e"),
-                Colonne("colonne", "Colonne", 200),
-                Colonne("message", "Message", 500),
+                Colonne("colonne", "Colonne", 160),
+                Colonne("message", "Message", 380),
+                Colonne("suggestion", "Suggestion", 380),
             ],
             hauteur=14,
         )
         tableau_avert.pack(fill="both", expand=True)
         tableau_avert.charger(
             [
-                {"_id": i, "ligne": a.ligne, "colonne": a.colonne, "message": a.message}
+                {
+                    "_id": i,
+                    "ligne": a.ligne,
+                    "colonne": a.colonne,
+                    "message": a.message,
+                    "suggestion": recommandations.suggestion_avertissement(a.colonne),
+                }
                 for i, a in enumerate(resultat.avertissements)
             ],
             cle_id="_id",

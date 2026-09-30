@@ -32,8 +32,8 @@ PROBLEME = (
 )
 
 REPONSE = (
-    "L'application traduit le volume prévu en heures, effectifs et équipements par site, zone et "
-    "jour, avec deux modèles comparés (régression linéaire et réseau de neurones). Elle confronte "
+    "L'application traduit la demande client en heures, effectifs et équipements par site, zone "
+    "et jour, avec deux modèles comparés (régression linéaire et réseau de neurones). Elle confronte "
     "ces besoins à la capacité planifiée, alerte dès le lundi en cas de sous-effectif, de "
     "sureffectif ou de pénurie d'équipements, puis mesure a posteriori la fiabilité des "
     "prévisions et la performance (KPI, rapports)."

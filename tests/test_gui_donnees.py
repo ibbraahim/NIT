@@ -105,6 +105,37 @@ def test_import_fichier_valides_et_rejetes(onglets_donnees, application, tmp_pat
     assert len(onglet.tableau.lignes()) == 1
 
 
+def test_resultat_import_affiche_une_suggestion_par_rejet(onglets_donnees, application):
+    from app.gui.widgets.resultat_import import DialogueResultatImport
+    from app.services.qualite import Avertissement, Rejet, ResultatControleQualite
+
+    resultat = ResultatControleQualite(
+        valides=[],
+        rejets=[Rejet(2, "zone", "Zone inconnue ou inactive : « Zone inconnue ».")],
+        avertissements=[
+            Avertissement(
+                3,
+                "volume_traite",
+                "Valeur inhabituelle : 5000 contre une "
+                "moyenne de 1000.0 sur les 8 mêmes jours de semaine précédents.",
+            )
+        ],
+    )
+
+    dialogue = DialogueResultatImport(
+        onglets_donnees, "Résultat de l'import", resultat, [], "rapport.xlsx"
+    )
+    application.racine.update()
+
+    ligne_rejet = dialogue.tableau_rejets.lignes()[0]
+    assert "zone" in ligne_rejet["suggestion"].lower()
+
+    ligne_avert = dialogue.tableau_avert.lignes()[0]
+    assert ligne_avert["suggestion"]  # une recommandation générique est toujours présente
+
+    dialogue.destroy()
+
+
 def test_saisie_prevision_volume(onglets_donnees, application):
     onglet = onglets_donnees.page_previsions
     onglet.champ_date.definir(date.today() + timedelta(days=3))

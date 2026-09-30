@@ -55,7 +55,7 @@ def generer_previsions(
     progression: Progression | None = None,
 ) -> ResumeGenerationPrevisions:
     """UC11 : calcule, avec RL et RN, les heures, l'effectif et les équipements nécessaires
-    pour chaque date de l'horizon. Une date sans volume prévu est ignorée et signalée."""
+    pour chaque date de l'horizon. Une date sans demande client est ignorée et signalée."""
     verifier_droit(ctx, "UC11")
     verifier_site(ctx, site_id)
     if horizon_jours not in HORIZONS_VALIDES:
@@ -86,7 +86,7 @@ def generer_previsions(
             dates_disponibles = [d for d in dates_horizon if d in volumes_zone]
             if len(dates_disponibles) < len(dates_horizon):
                 resume.avertissements.append(
-                    f"Zone « {zone['nom']} » : volume prévu manquant pour "
+                    f"Zone « {zone['nom']} » : demande client manquante pour "
                     f"{len(dates_horizon) - len(dates_disponibles)} date(s) (ignorées)."
                 )
             if not dates_disponibles:

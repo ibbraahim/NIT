@@ -99,7 +99,7 @@ CHAMPS_HISTORIQUE: list[ChampSpec] = [
 ]
 
 CHAMPS_PREVISION: list[ChampSpec] = [
-    ChampSpec("volume_prevu", "Volume prévu", "nombre", obligatoire=True),
+    ChampSpec("volume_prevu", "Volume demandé", "nombre", obligatoire=True),
     ChampSpec("indicateur_pic", "Indicateur de pic", "booleen", defaut=False),
 ]
 

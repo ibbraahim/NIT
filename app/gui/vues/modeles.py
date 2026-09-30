@@ -15,7 +15,7 @@ from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import CIBLES_MODELE, METHODES
 from app.ml.preparation import JOURS_SEMAINE, LIBELLES_VARIABLES, VARIABLES_PAR_DEFAUT
-from app.services import admin, alertes, modeles
+from app.services import admin, alertes, modeles, recommandations
 from app.utils.format_fr import formater_date_heure, formater_nombre, formater_pourcentage
 
 OPTIONS_ACTIVATION = [
@@ -341,6 +341,7 @@ class OngletEntrainement(ttk.Frame):
         texte = " · ".join(
             f"{'⛔' if a['niveau'] == 'rouge' else '⚠'} {a['message']}" for a in ouvertes
         )
+        texte += f" — {recommandations.suggestion_alerte('derive_modele')}"
         self.label_derive.configure(text=texte)
         self.bandeau_derive.pack(fill="x", pady=(0, 8), before=self.haut_barre)
 

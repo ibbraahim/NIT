@@ -12,7 +12,7 @@ from app.gui.widgets.champs import ChampListe, ChampTexteLong
 from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, informer
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.libelles import NIVEAUX_ALERTE, STATUTS_ALERTE, TYPES_ALERTE, libelle
-from app.services import alertes
+from app.services import alertes, recommandations
 from app.services.droits import a_le_droit
 from app.utils.format_fr import formater_date_heure
 
@@ -32,6 +32,7 @@ COLONNES_TABLEAU = [
     Colonne("message", "Message", 340),
     Colonne("statut_libelle", "Statut", 90, "center"),
     Colonne("date_maj", "Dernière mise à jour", 150, "center", formateur=formater_date_heure),
+    Colonne("suggestion", "Action suggérée", 320),
 ]
 
 
@@ -109,6 +110,11 @@ class VueAlertes(Vue):
             ligne["type_libelle"] = libelle(TYPES_ALERTE, ligne["type"])
             ligne["niveau_libelle"] = libelle(NIVEAUX_ALERTE, ligne["niveau"])
             ligne["statut_libelle"] = libelle(STATUTS_ALERTE, ligne["statut"])
+            ligne["suggestion"] = (
+                ""
+                if ligne["statut"] == "resolue"
+                else recommandations.suggestion_alerte(ligne["type"])
+            )
         self.tableau.charger(
             lignes,
             cle_id="id",

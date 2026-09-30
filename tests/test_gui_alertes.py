@@ -63,6 +63,7 @@ def test_detecter_puis_prendre_en_charge_et_resoudre(application):
     assert alerte["type"] == "sous_effectif"
     assert alerte["niveau"] == "rouge"
     assert alerte["statut"] == "ouverte"
+    assert "intérim" in alerte["suggestion"].lower()
 
     vue.tableau.selectionner(alerte["id"])
     application.racine.update()
@@ -92,6 +93,7 @@ def test_detecter_puis_prendre_en_charge_et_resoudre(application):
     application.racine.update()
     resolue = next(l for l in vue.tableau.lignes() if l["id"] == alerte["id"])
     assert resolue["statut"] == "resolue"
+    assert resolue["suggestion"] == ""  # plus d'action à suggérer une fois l'alerte close
 
 
 def test_afficher_parametres_selectionne_l_alerte(application):

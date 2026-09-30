@@ -13,7 +13,7 @@ from app.gui.widgets.champs import ChampDate, ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
 from app.gui.widgets.graphique import GraphiqueIntegre
 from app.gui.widgets.taches_fond import executer_en_fond
-from app.services import admin, alertes, comparaison, kpi
+from app.services import admin, alertes, comparaison, kpi, recommandations
 from app.services.droits import a_le_droit
 from app.utils.fichiers_excel import ecrire_classeur
 from app.utils.format_fr import formater_date, formater_nombre
@@ -158,6 +158,7 @@ class VueComparaison(Vue):
         texte = " · ".join(
             f"{'⛔' if a['niveau'] == 'rouge' else '⚠'} {a['message']}" for a in ouvertes
         )
+        texte += f" — {recommandations.suggestion_alerte('derive_modele')}"
         self.label_derive.configure(text=texte)
         self.bandeau_derive.pack(fill="x", pady=(0, 8), before=self._barre_filtres)
 

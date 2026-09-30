@@ -13,7 +13,7 @@ from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, confirmer, 
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
 from app.libelles import FAMILLES_KPI, METHODES_COURTES, PERIODICITES, STATUTS_KPI, libelle
-from app.services import admin, kpi
+from app.services import admin, kpi, recommandations
 from app.services.droits import a_le_droit
 from app.utils.format_fr import formater_nombre
 
@@ -124,6 +124,38 @@ class OngletSuiviKpi(ttk.Frame):
         corps.pack(fill="both", expand=True)
         self.tableau = TableauTriable(corps, COLONNES_TABLEAU, hauteur=16)
         self.tableau.pack(fill="both", expand=True)
+        self.tableau.sur_selection(self._sur_selection_kpi)
+
+        self.cadre_interpretation = ttk.Frame(self, style="Carte.TFrame", padding=10)
+        self.label_explication = ttk.Label(
+            self.cadre_interpretation,
+            text="",
+            style="Section.TLabel",
+            background="#ffffff",
+            wraplength=900,
+        )
+        self.label_explication.pack(anchor="w")
+        self.label_conseil = ttk.Label(
+            self.cadre_interpretation, text="", background="#ffffff", wraplength=900
+        )
+        self.label_conseil.pack(anchor="w", pady=(4, 0))
+        self.cadre_interpretation.pack_forget()
+
+    def _sur_selection_kpi(self) -> None:
+        ligne = self.tableau.ligne_selectionnee()
+        interpretation = (
+            recommandations.interpreter_kpi(
+                ligne["kpi_code"], ligne["sens"], ligne["valeur"], ligne["cible"]
+            )
+            if ligne is not None and ligne["statut"] in ("orange", "rouge")
+            else None
+        )
+        if interpretation is None:
+            self.cadre_interpretation.pack_forget()
+            return
+        self.label_explication.configure(text=interpretation.explication)
+        self.label_conseil.configure(text=f"Action suggérée — {interpretation.conseil}")
+        self.cadre_interpretation.pack(fill="x", pady=(10, 0))
 
     def actualiser(self) -> None:
         sites = self.vue.executer(lambda: admin.lister_sites(self.ctx)) or []
@@ -186,6 +218,7 @@ class OngletSuiviKpi(ttk.Frame):
             message_vide="Aucun KPI calculé pour cette période. "
             "Utilisez « Calculer et comparer maintenant ».",
         )
+        self._sur_selection_kpi()
 
     def calculer(self) -> None:
         site_id, zone_id = self.site.valeur(), self.zone.valeur()

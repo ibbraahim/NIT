@@ -25,7 +25,7 @@ OPTIONS_HORIZON = [(h, f"{h} jours") for h in HORIZONS_VALIDES]
 COLONNES_TABLEAU = [
     Colonne("date_jour", "Date", 100, "center"),
     Colonne("zone", "Zone", 120),
-    Colonne("volume_prevu", "Volume prévu", 110, "e"),
+    Colonne("volume_prevu", "Volume demandé", 110, "e"),
     Colonne("heures_rl", "Heures RL", 100, "e"),
     Colonne("heures_rn", "Heures RN", 100, "e"),
     Colonne("effectif_rl", "Effectif RL", 100, "e"),
@@ -51,7 +51,7 @@ class VuePrevisions(Vue):
     """Filtres Site/Zone/Horizon, génération, tableau et graphique RL/RN."""
 
     titre = "Prévisions"
-    sous_titre = "Traduction du volume prévu en heures, effectif et équipements"
+    sous_titre = "Traduction de la demande client en heures, effectif et équipements"
 
     def construire(self) -> None:
         self.peut_generer = a_le_droit(self.ctx, "UC11")
@@ -221,7 +221,7 @@ class VuePrevisions(Vue):
         entetes = [
             "Date",
             "Zone",
-            "Volume prévu",
+            "Volume demandé",
             "Heures RL",
             "Heures RN",
             "Effectif RL",

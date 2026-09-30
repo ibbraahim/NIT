@@ -83,6 +83,48 @@ def test_filtre_par_famille(vue_kpi, application):
     assert all(l["famille"] == "precision" for l in vue.tableau.lignes())
 
 
+def test_interpretation_kpi_hors_cible(vue_kpi, application):
+    vue, _site_id, _zone_id = vue_kpi
+    # Ligne synthétique (KPI hors cible), pour tester le panneau d'interprétation sans
+    # dépendre du statut, incidental, des 27 KPI calculés à partir du jeu de test.
+    vue.tableau.charger(
+        [
+            {
+                "id": 999999,
+                "kpi_code": "TAUX_HS",
+                "kpi_libelle": "Taux d'heures supplémentaires (%)",
+                "famille_libelle": "Ressources humaines",
+                "methode_libelle": "—",
+                "valeur_affichee": "20,0 %",
+                "cible_affichee": "5,0 %",
+                "statut_libelle": "Rouge",
+                "tendance": "→",
+                "sens": "baisse",
+                "valeur": 20.0,
+                "cible": 5.0,
+                "statut": "rouge",
+            }
+        ],
+        cle_id="id",
+    )
+    application.racine.update()
+    assert not vue.cadre_interpretation.winfo_ismapped()  # rien sélectionné
+
+    vue.tableau.selectionner(999999)
+    application.racine.update()
+    vue._sur_selection_kpi()
+    application.racine.update()
+
+    assert vue.cadre_interpretation.winfo_ismapped()
+    assert "heures supplémentaires" in vue.label_explication.cget("text").lower()
+    assert vue.label_conseil.cget("text").startswith("Action suggérée")
+
+    vue.tableau.charger([], cle_id="id")
+    vue._sur_selection_kpi()
+    application.racine.update()
+    assert not vue.cadre_interpretation.winfo_ismapped()
+
+
 def test_gerer_les_cibles_ajouter_modifier_supprimer(vue_kpi, application):
     from app.gui.vues.kpi_cibles import FenetreObjectif
     from app.services import kpi
