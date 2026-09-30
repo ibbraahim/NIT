@@ -9,7 +9,14 @@ from tkinter import ttk
 import numpy as np
 
 from app.erreurs import ErreurApplication
-from app.gui.style import COULEURS, COULEURS_STATUT, COULEURS_STATUT_CLAIR
+from app.gui.degrades import image_degradee
+from app.gui.style import (
+    COULEUR_ACCENT_3,
+    COULEURS,
+    COULEURS_DEGRADE_MARQUE,
+    COULEURS_STATUT,
+    COULEURS_STATUT_CLAIR,
+)
 from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe
@@ -93,25 +100,76 @@ def _trouver_kpi(valeurs: list[dict], code: str) -> dict | None:
     return next((v for v in valeurs if v["kpi_code"] == code), None)
 
 
+def _lier_survol_tuile(cadre: tk.Frame, couleur_repos: str, couleur_survol: str) -> None:
+    """Illumine la bordure de ``cadre`` au survol de la tuile (élévation légère, équivalent
+    statique du « hover » de la référence visuelle). Lié à tous les descendants : les
+    événements Entrer/Sortir de Tk ne remontent pas d'un enfant vers son parent, et un « Sortir »
+    déclenché en passant d'un enfant à un autre (donc toujours à l'intérieur de la tuile) est
+    ignoré grâce à une vérification du widget réellement sous le pointeur."""
+
+    def _entrer(_evenement=None) -> None:
+        cadre.configure(highlightbackground=couleur_survol, highlightcolor=couleur_survol)
+
+    def _sortir(_evenement=None) -> None:
+        x, y = cadre.winfo_pointerxy()
+        sous_pointeur = cadre.winfo_containing(x, y)
+        if sous_pointeur is not None and str(sous_pointeur).startswith(str(cadre)):
+            return
+        cadre.configure(highlightbackground=couleur_repos, highlightcolor=couleur_repos)
+
+    for widget in (cadre, *cadre.winfo_children()):
+        widget.bind("<Enter>", _entrer, add="+")
+        widget.bind("<Leave>", _sortir, add="+")
+        for petit_enfant in widget.winfo_children():
+            petit_enfant.bind("<Enter>", _entrer, add="+")
+            petit_enfant.bind("<Leave>", _sortir, add="+")
+
+
 def _construire_tuile(
     parent: tk.Widget, titre: str, valeur_texte: str, cible_texte: str, statut
-) -> ttk.Frame:
-    """Une carte KPI colorée selon son statut (vert/orange/rouge/gris)."""
-    cadre = ttk.Frame(parent, style="Carte.TFrame", padding=12)
+) -> tk.Frame:
+    """Une carte KPI colorée selon son statut (vert/orange/rouge/gris), avec une fine bande en
+    dégradé de marque en haut et une bordure qui s'illumine légèrement au survol."""
+    couleur_bordure_repos = COULEURS["gris_clair"]
+    cadre = tk.Frame(
+        parent,
+        background=COULEURS["surface"],
+        highlightthickness=1,
+        highlightbackground=couleur_bordure_repos,
+        highlightcolor=couleur_bordure_repos,
+        borderwidth=0,
+    )
+    bande = tk.Canvas(cadre, height=4, highlightthickness=0, background=COULEURS["surface"])
+    bande.pack(fill="x", side="top")
+    bande._image_degradee = None  # référence conservée pour éviter le ramasse-miettes de Tk
+
+    def _redessiner_bande(_evenement=None) -> None:
+        largeur = bande.winfo_width()
+        if largeur <= 1:
+            return
+        chemin = image_degradee(largeur, 4, COULEURS_DEGRADE_MARQUE)
+        bande._image_degradee = tk.PhotoImage(file=str(chemin))
+        bande.delete("all")
+        bande.create_image(0, 0, anchor="nw", image=bande._image_degradee)
+
+    bande.bind("<Configure>", _redessiner_bande)
+
+    corps = tk.Frame(cadre, background=COULEURS["surface"])
+    corps.pack(fill="both", expand=True, padx=12, pady=(8, 12))
     fond = {"background": COULEURS["surface"]}
     tk.Label(
-        cadre, text=titre, font=("", 9, "bold"), foreground=COULEURS["texte_secondaire"], **fond
+        corps, text=titre, font=("", 9, "bold"), foreground=COULEURS["texte_secondaire"], **fond
     ).pack(anchor="w")
     tk.Label(
-        cadre, text=valeur_texte, font=("", 20, "bold"), foreground=COULEURS["texte"], **fond
+        corps, text=valeur_texte, font=("", 20, "bold"), foreground=COULEURS["texte"], **fond
     ).pack(anchor="w", pady=(2, 0))
     if cible_texte:
         tk.Label(
-            cadre, text=cible_texte, font=("", 9), foreground=COULEURS["texte_secondaire"], **fond
+            corps, text=cible_texte, font=("", 9), foreground=COULEURS["texte_secondaire"], **fond
         ).pack(anchor="w")
     if statut is not None:
         tk.Label(
-            cadre,
+            corps,
             text=LIBELLES_STATUT.get(statut, "Non calculé"),
             font=("", 8, "bold"),
             background=COULEURS_STATUT_CLAIR.get(statut, COULEURS["gris_clair"]),
@@ -119,6 +177,7 @@ def _construire_tuile(
             padx=8,
             pady=2,
         ).pack(anchor="w", pady=(8, 0))
+    _lier_survol_tuile(cadre, couleur_bordure_repos, COULEUR_ACCENT_3)
     return cadre
 
 
