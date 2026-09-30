@@ -13,6 +13,7 @@ from tkinter import filedialog, ttk
 
 from app.erreurs import DonneesInvalides, ErreurApplication
 from app.gui.style import COULEURS
+from app.gui.widgets.bouton import BoutonPrimaire
 from app.gui.widgets.champs import appliquer_erreurs
 from app.journal import journal
 
@@ -49,12 +50,10 @@ class DialogueBase(tk.Toplevel):
     def ajouter_bouton(
         self, texte: str, commande: Callable[[], None], primaire: bool = False, defaut: bool = False
     ) -> ttk.Button:
-        bouton = ttk.Button(
-            self.barre_boutons,
-            text=texte,
-            command=commande,
-            style="Primaire.TButton" if primaire else "TButton",
-        )
+        if primaire:
+            bouton = BoutonPrimaire(self.barre_boutons, texte, commande)
+        else:
+            bouton = ttk.Button(self.barre_boutons, text=texte, command=commande)
         bouton.pack(side="right", padx=(8, 0))
         if defaut:
             self.bind("<Return>", lambda _e: commande())

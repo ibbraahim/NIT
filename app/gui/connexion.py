@@ -12,6 +12,7 @@ from app.contexte import Contexte
 from app.erreurs import ErreurApplication
 from app.gui.degrades import image_lueur_radiale, melanger
 from app.gui.style import COULEUR_ACCENT_4, COULEUR_FOND_MARQUE, COULEUR_FOND_MARQUE_PROFOND
+from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampTexte
 from app.journal import journal
 from app.services import auth
@@ -63,9 +64,7 @@ class EcranConnexion(ttk.Frame):
         boutons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(16, 0))
         self.bouton_quitter = ttk.Button(boutons, text="Quitter", command=sur_quitter)
         self.bouton_quitter.pack(side="right")
-        self.bouton_connexion = ttk.Button(
-            boutons, text="Se connecter", style="Primaire.TButton", command=self.se_connecter
-        )
+        self.bouton_connexion = Bouton(boutons, "Se connecter", self.se_connecter, primaire=True)
         self.bouton_connexion.pack(side="right", padx=(0, 8))
         ttk.Label(carte, text=f"Version {VERSION}", style="MarqueAide.TLabel").grid(
             row=7, column=0, sticky="w", pady=(18, 0)
