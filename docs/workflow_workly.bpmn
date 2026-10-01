@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Workly" targetNamespace="http://workly.local/bpmn" exporter="Workly" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_Workly">
+    <bpmn:participant id="Pool_Workly" name="Workly — Planification RH et équipements" processRef="Process_Workly" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Workly" name="Workflow Workly" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="lane_admin" name="Administrateur">
+        <bpmn:flowNodeRef>debut</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ref</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>util</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>param</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>entr1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>planif_on</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>entr2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_planif" name="Planificateur">
+        <bpmn:flowNodeRef>demande</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_qual</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>corriger</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>consult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>proposer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ajuster</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>soumettre</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_alerte</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>prise</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>cloture</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>m_alerte</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_resp" name="Responsable d'exploitation">
+        <bpmn:flowNodeRef>examiner</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_plan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>rejeter</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>valider</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>suivi</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_derive</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>export</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_direction" name="Direction">
+        <bpmn:flowNodeRef>dashboard</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>fin</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_systeme" name="Système (tâches automatiques)">
+        <bpmn:flowNodeRef>t_nuit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>import</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>compar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>kpi</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>alertes</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>prev</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>alertes2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_hebdo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>rapports</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="debut" name="Mise en service">
+      <bpmn:documentation>Installation faite, base PostgreSQL créée (python -m app.bd.init_bd).</bpmn:documentation>
+      <bpmn:outgoing>Flow_0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="ref" name="Paramétrer les référentiels&#10;(sites, zones, équipements,&#10;capacités, coûts)">
+      <bpmn:documentation>UC02, UC03 — écran Administration.</bpmn:documentation>
+      <bpmn:incoming>Flow_0</bpmn:incoming>
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="util" name="Créer les comptes&#10;utilisateurs et rôles">
+      <bpmn:documentation>UC02 — écran Administration → Utilisateurs.</bpmn:documentation>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="param" name="Paramétrer les modèles&#10;RL et RN">
+      <bpmn:documentation>UC07 — écran Modèles → Paramètres.</bpmn:documentation>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="entr1" name="Entraîner et activer&#10;les modèles">
+      <bpmn:documentation>UC08, UC09, UC10 — écran Modèles → Entraînement. Sans version active, UC11/UC12 refusent.</bpmn:documentation>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="planif_on" name="Démarrer le planificateur&#10;de tâches">
+      <bpmn:documentation>Administration → Tâches → Démarrer le planificateur.</bpmn:documentation>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="demande" name="Saisir ou importer&#10;la demande client">
+      <bpmn:documentation>UC05 — écran Données → Demande client (saisie ou fichier CSV/Excel).</bpmn:documentation>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_qual" name="Contrôle qualité&#10;OK ?">
+      <bpmn:documentation>Règles de qualité des données (app/services/qualite.py).</bpmn:documentation>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="corriger" name="Corriger les lignes&#10;rejetées">
+      <bpmn:documentation>Rapport d'erreurs téléchargeable avec suggestion par rejet.</bpmn:documentation>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:intermediateCatchEvent id="t_nuit" name="Chaque nuit&#10;01:00">
+      <bpmn:documentation>Planificateur de tâches APScheduler.</bpmn:documentation>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:incoming>Flow_33</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_t_nuit" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="import" name="Importer l'historique&#10;de la veille">
+      <bpmn:documentation>UC04, UC06 — tâche import_historique (dossier entrees/historique).</bpmn:documentation>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="compar" name="Comparer réel / prévu&#10;et détecter la dérive">
+      <bpmn:documentation>UC20, UC21 — tâche comparaison_quotidienne (01:30).</bpmn:documentation>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="kpi" name="Calculer les KPI&#10;du jour">
+      <bpmn:documentation>UC16, UC17 — tâche kpi_quotidiens (01:45).</bpmn:documentation>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="alertes" name="Émettre les alertes&#10;de capacité et de seuil">
+      <bpmn:documentation>UC18 — tâche alertes_capacite (01:50).</bpmn:documentation>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="prev" name="Générer les prévisions&#10;J+1 à J+14">
+      <bpmn:documentation>UC11 — tâche previsions_quotidiennes (02:00), RL et RN.</bpmn:documentation>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="consult" name="Consulter les prévisions&#10;(heures, effectif, équipements)">
+      <bpmn:documentation>UC11 — écran Prévisions.</bpmn:documentation>
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="proposer" name="Proposer le plan&#10;de charge">
+      <bpmn:documentation>UC12 — écran Plan de charge → Proposer le plan.</bpmn:documentation>
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="ajuster" name="Ajuster la grille&#10;et simuler un scénario">
+      <bpmn:documentation>UC13 — Simuler un scénario…, Enregistrer le brouillon.</bpmn:documentation>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="soumettre" name="Soumettre le plan&#10;pour validation">
+      <bpmn:documentation>UC14 — commentaire obligatoire sur toute case en dépassement.</bpmn:documentation>
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="examiner" name="Examiner le plan&#10;soumis">
+      <bpmn:documentation>Écran Plan de charge (rôle responsable).</bpmn:documentation>
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_plan" name="Plan accepté ?">
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="rejeter" name="Rejeter le plan&#10;avec un motif">
+      <bpmn:documentation>Le motif est affiché au planificateur.</bpmn:documentation>
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="valider" name="Valider le plan">
+      <bpmn:documentation>Le plan validé devient la référence de l'adéquation de l'effectif.</bpmn:documentation>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="alertes2" name="Émettre les alertes&#10;sur le plan validé">
+      <bpmn:documentation>UC18 — sous-effectif, sureffectif, pénurie d'équipements.</bpmn:documentation>
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="g_alerte" name="Alerte&#10;ouverte ?">
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+      <bpmn:outgoing>Flow_29</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="prise" name="Prendre l'alerte&#10;en charge">
+      <bpmn:documentation>UC19 — écran Alertes (planificateur ou responsable).</bpmn:documentation>
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="cloture" name="Clôturer avec&#10;l'action menée">
+      <bpmn:documentation>UC19 — commentaire de clôture obligatoire.</bpmn:documentation>
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+      <bpmn:outgoing>Flow_28</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="m_alerte">
+      <bpmn:incoming>Flow_28</bpmn:incoming>
+      <bpmn:incoming>Flow_29</bpmn:incoming>
+      <bpmn:outgoing>Flow_30</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="suivi" name="Suivre les KPI,&#10;les cibles et les écarts">
+      <bpmn:documentation>UC15, UC16, UC17, UC20 — écrans KPI et cibles, Comparaison réel / prévu.</bpmn:documentation>
+      <bpmn:incoming>Flow_30</bpmn:incoming>
+      <bpmn:outgoing>Flow_31</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_derive" name="Dérive de modèle&#10;ou KPI critique ?">
+      <bpmn:documentation>UC21 — alerte « dérive de modèle ».</bpmn:documentation>
+      <bpmn:incoming>Flow_31</bpmn:incoming>
+      <bpmn:outgoing>Flow_32</bpmn:outgoing>
+      <bpmn:outgoing>Flow_34</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="entr2" name="Réentraîner et activer&#10;une meilleure version">
+      <bpmn:documentation>UC08, UC09, UC10 — après comparaison des métriques avant activation.</bpmn:documentation>
+      <bpmn:incoming>Flow_32</bpmn:incoming>
+      <bpmn:outgoing>Flow_33</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:intermediateCatchEvent id="t_hebdo" name="Tâches périodiques&#10;(hebdo, mois, année)">
+      <bpmn:documentation>Réentraînement hebdomadaire (lundi 03:00 par défaut), KPI mensuels et annuels.</bpmn:documentation>
+      <bpmn:incoming>Flow_34</bpmn:incoming>
+      <bpmn:outgoing>Flow_35</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_t_hebdo" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="rapports" name="Générer les rapports&#10;PDF et Excel">
+      <bpmn:documentation>UC23 — tâches rapport_quotidien, hebdomadaire, mensuel, annuel.</bpmn:documentation>
+      <bpmn:incoming>Flow_35</bpmn:incoming>
+      <bpmn:outgoing>Flow_36</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="export" name="Consulter et exporter&#10;les rapports">
+      <bpmn:documentation>UC24 — écran Rapports.</bpmn:documentation>
+      <bpmn:incoming>Flow_36</bpmn:incoming>
+      <bpmn:outgoing>Flow_37</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="dashboard" name="Consulter le tableau&#10;de bord">
+      <bpmn:documentation>UC22 — écran Tableau de bord (vue Direction : tendances 12 mois, coût, service).</bpmn:documentation>
+      <bpmn:incoming>Flow_37</bpmn:incoming>
+      <bpmn:outgoing>Flow_38</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="fin" name="Décisions prises,&#10;cycle suivant">
+      <bpmn:incoming>Flow_38</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0" sourceRef="debut" targetRef="ref" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="ref" targetRef="util" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="util" targetRef="param" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="param" targetRef="entr1" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="entr1" targetRef="planif_on" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="planif_on" targetRef="demande" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="demande" targetRef="g_qual" />
+    <bpmn:sequenceFlow id="Flow_7" name="Non" sourceRef="g_qual" targetRef="corriger" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="corriger" targetRef="demande" />
+    <bpmn:sequenceFlow id="Flow_9" name="Oui" sourceRef="g_qual" targetRef="t_nuit" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="t_nuit" targetRef="import" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="import" targetRef="compar" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="compar" targetRef="kpi" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="kpi" targetRef="alertes" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="alertes" targetRef="prev" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="prev" targetRef="consult" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="consult" targetRef="proposer" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="proposer" targetRef="ajuster" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="ajuster" targetRef="soumettre" />
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="soumettre" targetRef="examiner" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="examiner" targetRef="g_plan" />
+    <bpmn:sequenceFlow id="Flow_21" name="Non" sourceRef="g_plan" targetRef="rejeter" />
+    <bpmn:sequenceFlow id="Flow_22" name="Plan à revoir" sourceRef="rejeter" targetRef="ajuster" />
+    <bpmn:sequenceFlow id="Flow_23" name="Oui" sourceRef="g_plan" targetRef="valider" />
+    <bpmn:sequenceFlow id="Flow_24" sourceRef="valider" targetRef="alertes2" />
+    <bpmn:sequenceFlow id="Flow_25" sourceRef="alertes2" targetRef="g_alerte" />
+    <bpmn:sequenceFlow id="Flow_26" name="Oui" sourceRef="g_alerte" targetRef="prise" />
+    <bpmn:sequenceFlow id="Flow_27" sourceRef="prise" targetRef="cloture" />
+    <bpmn:sequenceFlow id="Flow_28" sourceRef="cloture" targetRef="m_alerte" />
+    <bpmn:sequenceFlow id="Flow_29" name="Non" sourceRef="g_alerte" targetRef="m_alerte" />
+    <bpmn:sequenceFlow id="Flow_30" sourceRef="m_alerte" targetRef="suivi" />
+    <bpmn:sequenceFlow id="Flow_31" sourceRef="suivi" targetRef="g_derive" />
+    <bpmn:sequenceFlow id="Flow_32" name="Oui" sourceRef="g_derive" targetRef="entr2" />
+    <bpmn:sequenceFlow id="Flow_33" name="Prévisions&#10;recalculées" sourceRef="entr2" targetRef="t_nuit" />
+    <bpmn:sequenceFlow id="Flow_34" name="Non" sourceRef="g_derive" targetRef="t_hebdo" />
+    <bpmn:sequenceFlow id="Flow_35" sourceRef="t_hebdo" targetRef="rapports" />
+    <bpmn:sequenceFlow id="Flow_36" sourceRef="rapports" targetRef="export" />
+    <bpmn:sequenceFlow id="Flow_37" sourceRef="export" targetRef="dashboard" />
+    <bpmn:sequenceFlow id="Flow_38" sourceRef="dashboard" targetRef="fin" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Workly">
+    <bpmndi:BPMNPlane id="Plane_Workly" bpmnElement="Collab_Workly">
+      <bpmndi:BPMNShape id="Pool_Workly_di" bpmnElement="Pool_Workly" isHorizontal="true"><dc:Bounds x="0" y="0" width="6040" height="1300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_admin_di" bpmnElement="lane_admin" isHorizontal="true"><dc:Bounds x="30" y="0" width="6010" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_planif_di" bpmnElement="lane_planif" isHorizontal="true"><dc:Bounds x="30" y="260" width="6010" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_resp_di" bpmnElement="lane_resp" isHorizontal="true"><dc:Bounds x="30" y="520" width="6010" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_direction_di" bpmnElement="lane_direction" isHorizontal="true"><dc:Bounds x="30" y="780" width="6010" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_systeme_di" bpmnElement="lane_systeme" isHorizontal="true"><dc:Bounds x="30" y="1040" width="6010" height="260" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="debut_di" bpmnElement="debut"><dc:Bounds x="72" y="112" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ref_di" bpmnElement="ref"><dc:Bounds x="200" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="util_di" bpmnElement="util"><dc:Bounds x="375" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="param_di" bpmnElement="param"><dc:Bounds x="550" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="entr1_di" bpmnElement="entr1"><dc:Bounds x="725" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="planif_on_di" bpmnElement="planif_on"><dc:Bounds x="900" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="demande_di" bpmnElement="demande"><dc:Bounds x="1075" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_qual_di" bpmnElement="g_qual" isMarkerVisible="true"><dc:Bounds x="1290" y="365" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1250" y="329" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="corriger_di" bpmnElement="corriger"><dc:Bounds x="1250" y="428" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nuit_di" bpmnElement="t_nuit"><dc:Bounds x="1472" y="1152" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="import_di" bpmnElement="import"><dc:Bounds x="1600" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="compar_di" bpmnElement="compar"><dc:Bounds x="1775" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="kpi_di" bpmnElement="kpi"><dc:Bounds x="1950" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="alertes_di" bpmnElement="alertes"><dc:Bounds x="2125" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="prev_di" bpmnElement="prev"><dc:Bounds x="2300" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="consult_di" bpmnElement="consult"><dc:Bounds x="2475" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="proposer_di" bpmnElement="proposer"><dc:Bounds x="2650" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ajuster_di" bpmnElement="ajuster"><dc:Bounds x="2825" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="soumettre_di" bpmnElement="soumettre"><dc:Bounds x="3000" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="examiner_di" bpmnElement="examiner"><dc:Bounds x="3175" y="612" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_plan_di" bpmnElement="g_plan" isMarkerVisible="true"><dc:Bounds x="3390" y="625" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="3350" y="589" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="rejeter_di" bpmnElement="rejeter"><dc:Bounds x="3350" y="688" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="valider_di" bpmnElement="valider"><dc:Bounds x="3525" y="612" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="alertes2_di" bpmnElement="alertes2"><dc:Bounds x="3700" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_alerte_di" bpmnElement="g_alerte" isMarkerVisible="true"><dc:Bounds x="3915" y="365" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="3875" y="419" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="prise_di" bpmnElement="prise"><dc:Bounds x="4050" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="cloture_di" bpmnElement="cloture"><dc:Bounds x="4225" y="352" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="m_alerte_di" bpmnElement="m_alerte" isMarkerVisible="true"><dc:Bounds x="4440" y="365" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="suivi_di" bpmnElement="suivi"><dc:Bounds x="4575" y="612" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_derive_di" bpmnElement="g_derive" isMarkerVisible="true"><dc:Bounds x="4790" y="625" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="4750" y="679" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="entr2_di" bpmnElement="entr2"><dc:Bounds x="4925" y="92" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_hebdo_di" bpmnElement="t_hebdo"><dc:Bounds x="5147" y="1152" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="rapports_di" bpmnElement="rapports"><dc:Bounds x="5275" y="1132" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="export_di" bpmnElement="export"><dc:Bounds x="5450" y="612" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="dashboard_di" bpmnElement="dashboard"><dc:Bounds x="5625" y="872" width="130" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fin_di" bpmnElement="fin"><dc:Bounds x="5847" y="892" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0_di" bpmnElement="Flow_0">
+        <di:waypoint x="108" y="130" />
+        <di:waypoint x="200" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="330" y="130" />
+        <di:waypoint x="375" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="505" y="130" />
+        <di:waypoint x="550" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="680" y="130" />
+        <di:waypoint x="725" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="855" y="130" />
+        <di:waypoint x="900" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="1030" y="130" />
+        <di:waypoint x="1052" y="130" />
+        <di:waypoint x="1052" y="390" />
+        <di:waypoint x="1075" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="1205" y="390" />
+        <di:waypoint x="1290" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1315" y="415" />
+        <di:waypoint x="1315" y="428" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1315" y="504" />
+        <di:waypoint x="1315" y="524" />
+        <di:waypoint x="1140" y="524" />
+        <di:waypoint x="1140" y="428" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1340" y="390" />
+        <di:waypoint x="1406" y="390" />
+        <di:waypoint x="1406" y="1170" />
+        <di:waypoint x="1472" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1508" y="1170" />
+        <di:waypoint x="1600" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1730" y="1170" />
+        <di:waypoint x="1775" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1905" y="1170" />
+        <di:waypoint x="1950" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="2080" y="1170" />
+        <di:waypoint x="2125" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="2255" y="1170" />
+        <di:waypoint x="2300" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="2430" y="1170" />
+        <di:waypoint x="2452" y="1170" />
+        <di:waypoint x="2452" y="390" />
+        <di:waypoint x="2475" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="2605" y="390" />
+        <di:waypoint x="2650" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="2780" y="390" />
+        <di:waypoint x="2825" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="2955" y="390" />
+        <di:waypoint x="3000" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="3130" y="390" />
+        <di:waypoint x="3152" y="390" />
+        <di:waypoint x="3152" y="650" />
+        <di:waypoint x="3175" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="3305" y="650" />
+        <di:waypoint x="3390" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="3415" y="675" />
+        <di:waypoint x="3415" y="688" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="3415" y="764" />
+        <di:waypoint x="3415" y="784" />
+        <di:waypoint x="2890" y="784" />
+        <di:waypoint x="2890" y="428" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="3440" y="650" />
+        <di:waypoint x="3525" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24">
+        <di:waypoint x="3655" y="650" />
+        <di:waypoint x="3678" y="650" />
+        <di:waypoint x="3678" y="1170" />
+        <di:waypoint x="3700" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25">
+        <di:waypoint x="3830" y="1170" />
+        <di:waypoint x="3872" y="1170" />
+        <di:waypoint x="3872" y="390" />
+        <di:waypoint x="3915" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26">
+        <di:waypoint x="3965" y="390" />
+        <di:waypoint x="4050" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27">
+        <di:waypoint x="4180" y="390" />
+        <di:waypoint x="4225" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_28_di" bpmnElement="Flow_28">
+        <di:waypoint x="4355" y="390" />
+        <di:waypoint x="4440" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_29_di" bpmnElement="Flow_29">
+        <di:waypoint x="3940" y="365" />
+        <di:waypoint x="3940" y="339" />
+        <di:waypoint x="4465" y="339" />
+        <di:waypoint x="4465" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_30_di" bpmnElement="Flow_30">
+        <di:waypoint x="4490" y="390" />
+        <di:waypoint x="4532" y="390" />
+        <di:waypoint x="4532" y="650" />
+        <di:waypoint x="4575" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_31_di" bpmnElement="Flow_31">
+        <di:waypoint x="4705" y="650" />
+        <di:waypoint x="4790" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_32_di" bpmnElement="Flow_32">
+        <di:waypoint x="4840" y="650" />
+        <di:waypoint x="4882" y="650" />
+        <di:waypoint x="4882" y="130" />
+        <di:waypoint x="4925" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_33_di" bpmnElement="Flow_33">
+        <di:waypoint x="4990" y="92" />
+        <di:waypoint x="4990" y="66" />
+        <di:waypoint x="1490" y="66" />
+        <di:waypoint x="1490" y="1152" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_34_di" bpmnElement="Flow_34">
+        <di:waypoint x="4840" y="650" />
+        <di:waypoint x="4994" y="650" />
+        <di:waypoint x="4994" y="1170" />
+        <di:waypoint x="5147" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_35_di" bpmnElement="Flow_35">
+        <di:waypoint x="5183" y="1170" />
+        <di:waypoint x="5275" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_36_di" bpmnElement="Flow_36">
+        <di:waypoint x="5405" y="1170" />
+        <di:waypoint x="5428" y="1170" />
+        <di:waypoint x="5428" y="650" />
+        <di:waypoint x="5450" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_37_di" bpmnElement="Flow_37">
+        <di:waypoint x="5580" y="650" />
+        <di:waypoint x="5602" y="650" />
+        <di:waypoint x="5602" y="910" />
+        <di:waypoint x="5625" y="910" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_38_di" bpmnElement="Flow_38">
+        <di:waypoint x="5755" y="910" />
+        <di:waypoint x="5847" y="910" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
