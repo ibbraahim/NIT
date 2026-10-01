@@ -119,7 +119,11 @@ Exécution manuelle, sans passer par l'interface :
 ```bash
 python -m app.taches lister                    # tâches disponibles
 python -m app.taches executer <nom_tache>       # exécute et journalise le résultat
+python -m app.taches serveur                    # point d'accès HTTP (jeton WORKLY_TOKEN_TACHES)
 ```
+
+Pour piloter ces tâches depuis une plateforme d'automatisation externe, voir
+`docs/automatisation_plateforme.md` (déclencheurs, nœuds, secrets et scénarios).
 
 ## Tests
 

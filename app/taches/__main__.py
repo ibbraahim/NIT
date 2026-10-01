@@ -4,6 +4,8 @@ Utilisation :
 
     python -m app.taches lister                  liste les tâches disponibles
     python -m app.taches executer <nom_tache>     exécute une tâche et journalise le résultat
+    python -m app.taches serveur                  point d'accès HTTP pour une plateforme
+                                                  d'automatisation (jeton WORKLY_TOKEN_TACHES)
 """
 
 from __future__ import annotations
@@ -25,6 +27,9 @@ def principal(arguments: list[str] | None = None) -> int:
     sous_analyseurs.add_parser("lister", help="liste les tâches disponibles")
     executer = sous_analyseurs.add_parser("executer", help="exécute une tâche")
     executer.add_argument("nom_tache", help="nom de la tâche à exécuter")
+    serveur = sous_analyseurs.add_parser("serveur", help="démarre le point d'accès HTTP")
+    serveur.add_argument("--hote", default="127.0.0.1", help="adresse d'écoute (défaut : locale)")
+    serveur.add_argument("--port", type=int, default=8765, help="port d'écoute (défaut : 8765)")
     options = analyseur.parse_args(arguments)
 
     configurer_journal()
@@ -32,6 +37,11 @@ def principal(arguments: list[str] | None = None) -> int:
     from app.taches.planificateur import TACHES, executer_tache
 
     try:
+        if options.commande == "serveur":
+            from app.taches.serveur import servir
+
+            servir(options.hote, options.port)
+            return 0
         if options.commande in (None, "lister"):
             print("Tâches disponibles :")
             for nom in sorted(TACHES):
