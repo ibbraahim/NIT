@@ -51,7 +51,7 @@ def test_jeton_obligatoire_et_verifie(adresse):
 def test_liste_des_taches(adresse):
     code, corps = appeler(adresse, "/taches")
     assert code == 200
-    assert len(corps["taches"]) == 9
+    assert len(corps["taches"]) == 10
     assert corps["cycle_nocturne"][0] == "import_historique"
 
 
@@ -92,7 +92,12 @@ def test_cycle_s_arrete_a_la_premiere_erreur(adresse, monkeypatch):
     code, corps = appeler(adresse, "/cycle-nocturne", "POST")
     assert code == 500
     assert corps["etape_en_echec"] == "kpi_quotidiens"
-    assert appelees == ["import_historique", "comparaison_quotidienne", "kpi_quotidiens"]
+    assert appelees == [
+        "import_historique",
+        "import_previsions_volume",
+        "comparaison_quotidienne",
+        "kpi_quotidiens",
+    ]
 
 
 def test_une_seule_tache_a_la_fois(adresse):

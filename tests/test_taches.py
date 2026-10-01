@@ -83,3 +83,21 @@ def test_planificateur_arreter_puis_redemarrer(bd_vierge):
         assert planificateur.est_actif
     finally:
         planificateur.arreter()
+
+
+def test_import_previsions_volume_traite_les_fichiers_deposes(
+    demo_referentiels, tmp_path, monkeypatch
+):
+    """Dossier vide : pas d'erreur ; fichier illisible : laissé en place, tâche en succès."""
+    from app.taches import planificateur
+
+    depot = tmp_path / "previsions"
+    depot.mkdir()
+    monkeypatch.setattr(planificateur, "DOSSIER_ENTREES_PREVISIONS", depot)
+    monkeypatch.setattr(planificateur, "DOSSIER_ENTREES_TRAITES", tmp_path / "traites")
+    assert "0 fichier(s) traité(s)" in executer_tache("import_previsions_volume")
+
+    (depot / "illisible.csv").write_bytes(b"\xff\xfe\x00")
+    message = executer_tache("import_previsions_volume")
+    assert "1 fichier(s) illisible(s)" in message
+    assert (depot / "illisible.csv").exists()

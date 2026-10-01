@@ -33,6 +33,7 @@ VARIABLE_JETON = "WORKLY_TOKEN_TACHES"
 LONGUEUR_MIN_JETON = 16
 CYCLE_NOCTURNE = (
     "import_historique",
+    "import_previsions_volume",
     "comparaison_quotidienne",
     "kpi_quotidiens",
     "alertes_capacite",

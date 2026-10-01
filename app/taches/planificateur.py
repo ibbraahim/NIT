@@ -1,11 +1,14 @@
 """Tâches automatiques : APScheduler (``BackgroundScheduler``) et journalisation dans
 ``journal_taches``.
 
-Neuf tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
+Dix tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
 de tâches »), pour chaque site :
 
 - ``import_historique`` (01:00) — UC04 (import) + UC06, sur les fichiers déposés dans
   ``entrees/historique/``, déplacés ensuite vers ``entrees/traites/``.
+- ``import_previsions_volume`` (01:10) — UC05 (import) + UC06, sur les fichiers déposés dans
+  ``entrees/previsions/`` (volumes prévus par le WMS), déplacés ensuite vers
+  ``entrees/traites/``.
 - ``comparaison_quotidienne`` (01:30) — UC20 puis UC21 (la dérive s'appuie sur le réel qui
   vient d'être rapproché).
 - ``kpi_quotidiens`` (01:45) — UC17 (jour), qui inclut UC16.
@@ -27,6 +30,7 @@ la tâche qui le produit.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.base import STATE_PAUSED, STATE_RUNNING, STATE_STOPPED
@@ -36,7 +40,11 @@ from app.bd.connexion import transaction
 from app.bd.depots.parametres_modele import DepotParametresModele
 from app.bd.depots.referentiels import DepotReferentiels
 from app.bd.depots.taches import DepotTaches
-from app.config import DOSSIER_ENTREES_HISTORIQUE, DOSSIER_ENTREES_TRAITES
+from app.config import (
+    DOSSIER_ENTREES_HISTORIQUE,
+    DOSSIER_ENTREES_PREVISIONS,
+    DOSSIER_ENTREES_TRAITES,
+)
 from app.contexte import CONTEXTE_SYSTEME
 from app.erreurs import ErreurApplication
 from app.journal import journal
@@ -61,6 +69,7 @@ JOURS_CRON = {
 #: ``hebdomadaire`` n'y figure pas : son jour et son heure sont configurables (UC07).
 FREQUENCES_FIXES = {
     "import_historique": "Chaque jour à 01:00",
+    "import_previsions_volume": "Chaque jour à 01:10",
     "comparaison_quotidienne": "Chaque jour à 01:30",
     "kpi_quotidiens": "Chaque jour à 01:45",
     "alertes_capacite": "Chaque jour à 01:50",
@@ -125,27 +134,25 @@ def _generer_rapports(periodicite: str, format_rapport: str = "pdf_excel") -> in
 
 
 # =====================================================================
-# Les neuf tâches automatiques
+# Les dix tâches automatiques
 # =====================================================================
-def tache_import_historique() -> str:
-    """UC04 (import) + UC06 : importe chaque fichier déposé dans ``entrees/historique/``, puis
-    le déplace vers ``entrees/traites/``. Un fichier illisible est laissé en place, pour
-    inspection, sans empêcher le traitement des autres."""
+def _importer_dossier(dossier: Path, importer: Callable, enregistrer: Callable) -> str:
+    """Importe chaque fichier d'un dossier de dépôt (UC06 appliqué par ``importer``), enregistre
+    les lignes valides, puis déplace le fichier vers ``entrees/traites/``. Un fichier illisible
+    est laissé en place, pour inspection, sans empêcher le traitement des autres."""
     fichiers = sorted(
-        f
-        for f in DOSSIER_ENTREES_HISTORIQUE.glob("*")
-        if f.suffix.lower() in EXTENSIONS_PRISES_EN_CHARGE
+        f for f in dossier.glob("*") if f.suffix.lower() in EXTENSIONS_PRISES_EN_CHARGE
     )
     total_valides = total_rejetees = total_avertissements = echecs = 0
     for fichier in fichiers:
         try:
-            resultat = donnees.importer_historique(CONTEXTE_SYSTEME, fichier)
+            resultat = importer(CONTEXTE_SYSTEME, fichier)
         except ErreurApplication as exc:
             echecs += 1
             _log.warning("Fichier « %s » illisible, laissé en place : %s", fichier.name, exc)
             continue
         if resultat.valides:
-            donnees.enregistrer_lignes_historique(CONTEXTE_SYSTEME, resultat.valides)
+            enregistrer(CONTEXTE_SYSTEME, resultat.valides)
         total_valides += len(resultat.valides)
         total_rejetees += len(resultat.rejets)
         total_avertissements += len(resultat.avertissements)
@@ -156,6 +163,24 @@ def tache_import_historique() -> str:
         f"valide(s), {total_rejetees} rejetée(s), {total_avertissements} avertissement(s)"
     )
     return message + (f", {echecs} fichier(s) illisible(s)." if echecs else ".")
+
+
+def tache_import_historique() -> str:
+    """UC04 (import) + UC06 : fichiers déposés dans ``entrees/historique/``."""
+    return _importer_dossier(
+        DOSSIER_ENTREES_HISTORIQUE,
+        donnees.importer_historique,
+        donnees.enregistrer_lignes_historique,
+    )
+
+
+def tache_import_previsions_volume() -> str:
+    """UC05 (import) + UC06 : fichiers de volumes prévus déposés dans ``entrees/previsions/``."""
+    return _importer_dossier(
+        DOSSIER_ENTREES_PREVISIONS,
+        donnees.importer_previsions_volume,
+        donnees.enregistrer_lignes_previsions,
+    )
 
 
 def tache_comparaison_quotidienne() -> str:
@@ -231,6 +256,7 @@ def tache_annuel() -> str:
 
 TACHES: dict[str, Callable[[], str]] = {
     "import_historique": tache_import_historique,
+    "import_previsions_volume": tache_import_previsions_volume,
     "comparaison_quotidienne": tache_comparaison_quotidienne,
     "kpi_quotidiens": tache_kpi_quotidiens,
     "alertes_capacite": tache_alertes_capacite,
@@ -289,6 +315,12 @@ class Planificateur:
             lambda: executer_tache("import_historique"),
             CronTrigger(hour=1, minute=0),
             id="import_historique",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: executer_tache("import_previsions_volume"),
+            CronTrigger(hour=1, minute=10),
+            id="import_previsions_volume",
             replace_existing=True,
         )
         self._scheduler.add_job(

@@ -44,6 +44,7 @@ from app.utils.format_fr import (
 OPTIONS_ROLES = [(r, LIBELLES_ROLES[r]) for r in ROLES_UTILISATEUR]
 LIBELLES_TACHES = {
     "import_historique": "Importer l'historique déposé (UC04, UC06)",
+    "import_previsions_volume": "Importer les prévisions de volume déposées (UC05, UC06)",
     "comparaison_quotidienne": "Comparer le réalisé aux prévisions et détecter une dérive "
     "(UC20, UC21)",
     "kpi_quotidiens": "Calculer les KPI du jour (UC16, UC17)",

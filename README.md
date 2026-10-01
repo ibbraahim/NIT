@@ -103,6 +103,7 @@ Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administrat
 | Tâche | Cas d'utilisation | Fréquence par défaut |
 |---|---|---|
 | `import_historique` | UC04 (import), UC06 | quotidienne, 01:00 |
+| `import_previsions_volume` | UC05 (import), UC06 | quotidienne, 01:10 |
 | `comparaison_quotidienne` | UC20, UC21 | quotidienne, 01:30 |
 | `kpi_quotidiens` | UC16, UC17 (jour) | quotidienne, 01:45 |
 | `alertes_capacite` | UC18 | quotidienne, 01:50 |

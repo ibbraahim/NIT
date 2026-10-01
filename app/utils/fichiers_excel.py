@@ -42,8 +42,14 @@ def lire_lignes_fichier(chemin: Path) -> list[dict[str, Any]]:
 
 
 def _lire_csv(chemin: Path) -> list[dict[str, Any]]:
-    with chemin.open(encoding="utf-8-sig", newline="") as fichier:
-        contenu = fichier.read()
+    try:
+        with chemin.open(encoding="utf-8-sig", newline="") as fichier:
+            contenu = fichier.read()
+    except UnicodeDecodeError as exc:
+        raise DonneesInvalides(
+            "Ce fichier CSV n'est pas encodé en UTF-8. Réenregistrez-le au format "
+            "« CSV UTF-8 » depuis Excel."
+        ) from exc
     if not contenu.strip():
         return []
     try:

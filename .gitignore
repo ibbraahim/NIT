@@ -8,6 +8,7 @@ journaux/*
 rapports/*
 modeles_enregistres/*
 entrees/historique/*
+entrees/previsions/*
 entrees/traites/*
 ressources/images/degrades/*
 ressources/images/icones/*

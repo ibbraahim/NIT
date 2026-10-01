@@ -65,7 +65,7 @@ Tâches).
 | Appel | Effet | Réponses |
 |---|---|---|
 | `GET /sante` | vivacité (sans jeton) | 200 `{"ok": true}` |
-| `GET /taches` | liste des 9 tâches et du cycle nocturne | 200, 401 |
+| `GET /taches` | liste des 10 tâches et du cycle nocturne | 200, 401 |
 | `POST /taches/<nom>` | exécute une tâche | 200 succès, 500 échec, 404 inconnue, 401 jeton, 409 déjà en cours |
 | `POST /cycle-nocturne` | enchaîne import → comparaison → KPI → alertes → prévisions → rapport, s'arrête à la première erreur | 200 ou 500 avec `etape_en_echec` |
 
@@ -118,6 +118,7 @@ notification. Ordre et décalage d'origine :
 | Ordre | Appel | Heure d'origine |
 |---|---|---|
 | 1 | `POST /taches/import_historique` | 01:00 |
+| 1 bis | `POST /taches/import_previsions_volume` | 01:10 |
 | 2 | `POST /taches/comparaison_quotidienne` | 01:30 |
 | 3 | `POST /taches/kpi_quotidiens` | 01:45 |
 | 4 | `POST /taches/alertes_capacite` | 01:50 |
@@ -159,10 +160,10 @@ Cron `0 5 1 1 *` ; appel `POST /taches/annuel`.
 | 2 | Requête HTTP | `GET {{URL_WORKLY}}/sante`, délai 10 s |
 | 3 | Condition (chemin erreur ou code ≠ 200) | notification « Point d'accès Workly injoignable » ; limiter à un message par heure |
 
-## 6. Dépôt de fichiers (import de l'historique)
+## 6. Dépôt de fichiers (historique et prévisions de volume)
 
-La tâche `import_historique` lit le dossier `entrees/historique/` de la machine qui fait tourner
-Workly. Si les fichiers arrivent ailleurs (mail, partage, stockage en ligne), ajouter en tête du
+La tâche `import_historique` lit le dossier `entrees/historique/`, et `import_previsions_volume`
+le dossier `entrees/previsions/`, de la machine qui fait tourner Workly. Si les fichiers arrivent ailleurs (mail, partage, stockage en ligne), ajouter en tête du
 scénario 1 un nœud « récupérer le fichier » (pièce jointe d'un mail, dossier surveillé,
 stockage) puis le déposer dans ce dossier (nœud « écrire un fichier » ou copie réseau) avant
 l'appel HTTP. Un fichier traité est déplacé dans `entrees/traites/`.
