@@ -11,6 +11,7 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
     GET  /sante               {"ok": true}                          (sans jeton)
     GET  /taches              liste des tâches
     POST /taches/<nom>        exécute une tâche
+    POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
     POST /cycle-nocturne      import → comparaison → KPI → alertes → prévisions → rapport,
                               arrêt à la première erreur
 """
@@ -123,6 +124,18 @@ def fabriquer_gestionnaire(jeton: str):
         def do_POST(self) -> None:  # noqa: N802
             if not self._autorise():
                 self._repondre(401, {"erreur": "Jeton manquant ou invalide."})
+                return
+            if self.path == "/test-mail":
+                from app.taches.notifications import envoyer
+
+                envoye = envoyer(
+                    "Workly : e-mail de test",
+                    "Si vous lisez ce message, les alertes par e-mail de Workly fonctionnent.",
+                )
+                self._repondre(
+                    200 if envoye else 500,
+                    {"statut": "succes" if envoye else "echec", "envoye": envoye},
+                )
                 return
             if self.path == "/cycle-nocturne":
                 self._executer_exclusif(executer_cycle)

@@ -42,6 +42,7 @@ from app.erreurs import ErreurApplication
 from app.journal import journal
 from app.services import alertes, comparaison, donnees, kpi, modeles, planification, rapports
 from app.services.modeles import DEFAUT_PARAMETRES
+from app.taches.notifications import notifier_echec
 from app.utils.fichiers_excel import EXTENSIONS_PRISES_EN_CHARGE
 
 _log = journal(__name__)
@@ -256,6 +257,7 @@ def executer_tache(nom: str) -> str:
         with transaction() as cur:
             DepotTaches(cur).terminer(tache_id, "echec", str(exc))
         _log.exception("Tâche « %s » en échec.", nom)
+        notifier_echec(nom)
         raise
     with transaction() as cur:
         DepotTaches(cur).terminer(tache_id, "succes", message)

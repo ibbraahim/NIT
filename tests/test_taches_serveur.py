@@ -112,3 +112,19 @@ def test_refus_de_demarrer_sans_jeton(monkeypatch):
     monkeypatch.setenv(serveur.VARIABLE_JETON, "court")
     with pytest.raises(SystemExit):
         serveur.servir()
+
+
+def test_route_test_mail(adresse, monkeypatch):
+    from app.taches import notifications
+
+    envoyes = []
+    monkeypatch.setattr(
+        notifications, "envoyer", lambda sujet, corps: envoyes.append(sujet) or True
+    )
+    assert appeler(adresse, "/test-mail", "POST", jeton=None)[0] == 401
+    code, corps = appeler(adresse, "/test-mail", "POST")
+    assert code == 200 and corps["envoye"] is True
+    assert envoyes == ["Workly : e-mail de test"]
+
+    monkeypatch.setattr(notifications, "envoyer", lambda sujet, corps: False)
+    assert appeler(adresse, "/test-mail", "POST")[0] == 500

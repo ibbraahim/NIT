@@ -72,6 +72,23 @@ Tâches).
 Toutes les requêtes `POST` portent l'en-tête `Authorization: Bearer {{TOKEN_WORKLY}}`. Corps de
 réponse : `{"tache", "statut": "succes"|"echec", "message" | "erreur", "duree_s"}`.
 
+## 4 bis. Alertes par e-mail envoyées par Workly
+
+Quand une tâche échoue (quel que soit son déclencheur : plateforme, planificateur interne ou
+ligne de commande), Workly envoie un e-mail par SMTP. Réglages, par variables d'environnement
+(sans elles, la notification est simplement désactivée) :
+
+| Variable | Rôle |
+|---|---|
+| `WORKLY_SMTP_UTILISATEUR` | compte d'envoi (obligatoire), par exemple l'adresse Gmail |
+| `WORKLY_SMTP_MOT_DE_PASSE` | **mot de passe d'application** Gmail (obligatoire) |
+| `WORKLY_ALERTE_DESTINATAIRE` | adresse qui reçoit les alertes (défaut : le compte d'envoi) |
+| `WORKLY_SMTP_HOTE`, `WORKLY_SMTP_PORT` | défaut `smtp.gmail.com`, `587` (STARTTLS) |
+
+`POST /test-mail` (avec le jeton) envoie un e-mail de test. Ce mécanisme ne couvre pas le cas
+où le serveur Workly lui-même est injoignable : la plateforme doit alors prévenir par son propre
+canal.
+
 ## 5. Scénarios à construire
 
 Fuseau horaire de tous les déclencheurs : celui du site (par exemple `Africa/Casablanca`).
