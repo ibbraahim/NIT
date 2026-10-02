@@ -616,7 +616,9 @@ def generer_previsions_et_plans_demo(
     ctx_resp = _contexte_compte("resp", "responsable", site_id)
 
     for zone_id in zones.values():
-        planification.generer_previsions(ctx_planif, site_id, zone_id, 28)
+        planification.generer_previsions(
+            ctx_planif, site_id, zone_id, 28, date_reference=date_reference
+        )
 
     semaine_demo = semaine_demonstration(date_reference)
     semaine_suivante = semaine_demo + timedelta(days=7)
