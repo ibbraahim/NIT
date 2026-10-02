@@ -85,7 +85,6 @@ class Application:
         droite = ttk.Frame(self._cadre, style="Page.TFrame")
         droite.pack(side="left", fill="both", expand=True)
         self._construire_entete(droite)
-        self._construire_bandeau_demo(droite)
         self.zone_contenu = ttk.Frame(droite, style="Page.TFrame")
         self.zone_contenu.pack(fill="both", expand=True)
         self.naviguer(ecran_initial or ACCUEIL[contexte.role])
@@ -257,33 +256,6 @@ class Application:
                 ("Se déconnecter", self.se_deconnecter),
             ],
         ).pack(side="left")
-
-    def _construire_bandeau_demo(self, parent: ttk.Frame) -> None:
-        if not self.etat.get("demonstration"):
-            return
-        c = COULEURS
-        conteneur = ttk.Frame(parent, style="Page.TFrame", padding=(28, 8, 28, 0))
-        conteneur.pack(fill="x")
-        carte = Carte(conteneur, marge=12, couleur=c["demo"], bordure=c["demo"], sur="page")
-        carte.pack(fill="x")
-        tk.Label(
-            carte.corps,
-            text="Données de démonstration — ce jeu de données est fictif et sert "
-            "uniquement à rejouer la situation du lundi.",
-            background=c["demo"],
-            foreground=c["demo_texte"],
-            font=("", 10, "bold"),
-            anchor="w",
-        ).pack(side="left")
-        fermer = tk.Label(
-            carte.corps,
-            text="✕",
-            background=c["demo"],
-            foreground=c["demo_texte"],
-            cursor="hand2",
-        )
-        fermer.pack(side="right")
-        fermer.bind("<Button-1>", lambda _evt: conteneur.destroy())
 
     # ------------------------------------------------------------------
     # Navigation

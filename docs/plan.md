@@ -48,7 +48,7 @@ app/
     generateur.py      jeu de démonstration reproductible (graine 42)
   gui/
     style.py                   unique feuille de style ttk (couleurs, polices, statuts vert/orange/rouge/gris)
-    fenetre_principale.py      bandeau, menu par rôle + compteur d'alertes, barre d'état, zone de contenu
+    fenetre_principale.py      en-tête, menu par rôle + compteur d'alertes, barre d'état, zone de contenu
     connexion.py               écran 1
     vues/
       tableau_bord.py  donnees.py  previsions.py  plan_charge.py  comparaison.py
