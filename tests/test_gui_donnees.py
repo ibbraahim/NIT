@@ -163,3 +163,19 @@ def test_saisie_prevision_date_passee_refusee(onglets_donnees, application):
     assert application.erreurs == []
     assert "passée" in onglet.champ_date.message.cget("text")
     assert not onglet.tableau.lignes()
+
+
+def test_boutons_importer_du_bandeau_ouvrent_le_bon_onglet(onglets_donnees, monkeypatch):
+    """Les boutons du bandeau affichent l'onglet du type choisi, puis lancent son import."""
+    appels = []
+    for nom, page in (
+        ("historique", onglets_donnees.page_historique),
+        ("previsions", onglets_donnees.page_previsions),
+    ):
+        monkeypatch.setattr(page, "importer", lambda nom=nom: appels.append(nom))
+
+    onglets_donnees._importer("previsions")
+    assert onglets_donnees.onglets.select() == str(onglets_donnees.page_previsions)
+    onglets_donnees._importer("historique")
+    assert onglets_donnees.onglets.select() == str(onglets_donnees.page_historique)
+    assert appels == ["previsions", "historique"]

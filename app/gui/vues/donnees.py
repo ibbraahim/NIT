@@ -40,6 +40,24 @@ class VueDonnees(Vue):
     sous_titre = "Historique d'activité et demande client"
 
     def construire(self) -> None:
+        carte_import = self.carte(
+            "Importer des données",
+            "Choisissez un fichier CSV ou Excel : il est contrôlé avant tout enregistrement.",
+        )
+        barre_import = ttk.Frame(carte_import.zone)
+        barre_import.pack(fill="x")
+        Bouton(
+            barre_import,
+            "Importer l'historique d'activité…",
+            lambda: self._importer("historique"),
+            primaire=True,
+        ).pack(side="left")
+        Bouton(
+            barre_import,
+            "Importer la demande client…",
+            lambda: self._importer("previsions"),
+            primaire=True,
+        ).pack(side="left", padx=(8, 0))
         self.onglets = Onglets(self.contenu)
         self.onglets.pack(fill="both", expand=True)
         self.page_historique = OngletHistorique(self.onglets, self)
@@ -50,6 +68,12 @@ class VueDonnees(Vue):
     def actualiser(self) -> None:
         self.page_historique.actualiser()
         self.page_previsions.actualiser()
+
+    def _importer(self, type_donnees: str) -> None:
+        """Affiche l'onglet du type choisi, puis ouvre l'import de fichier de cet onglet."""
+        page = self.page_historique if type_donnees == "historique" else self.page_previsions
+        self.onglets.select(page)
+        page.importer()
 
 
 class OngletSaisieImport(ttk.Frame):
