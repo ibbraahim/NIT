@@ -29,7 +29,7 @@ class FauxSmtp:
     envois: list = []
     appels: list = []
 
-    def __init__(self, hote, port, timeout=None):
+    def __init__(self, hote, port, timeout=None, context=None):
         FauxSmtp.appels.append(("connexion", hote, port))
 
     def __enter__(self):
@@ -38,7 +38,7 @@ class FauxSmtp:
     def __exit__(self, *_):
         return False
 
-    def starttls(self):
+    def starttls(self, context=None):
         FauxSmtp.appels.append(("starttls",))
 
     def login(self, utilisateur, mot_de_passe):
@@ -52,6 +52,7 @@ class FauxSmtp:
 def faux_smtp(monkeypatch):
     FauxSmtp.envois, FauxSmtp.appels = [], []
     monkeypatch.setattr(smtplib, "SMTP", FauxSmtp)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", FauxSmtp)
     return FauxSmtp
 
 
@@ -80,6 +81,16 @@ def test_envoi_avec_starttls_et_connexion(monkeypatch, faux_smtp):
     assert message["To"] == "equipe@exemple.test"
     assert message["From"] == "alertes@exemple.test"
     assert message["Subject"] == "Sujet"
+
+
+def test_port_465_utilise_ssl_direct_sans_starttls(monkeypatch, faux_smtp):
+    configurer(monkeypatch)
+    monkeypatch.setenv("WORKLY_SMTP_PORT", "465")
+    assert notifications.envoyer("Sujet", "Corps") is True
+    assert faux_smtp.appels == [
+        ("connexion", "smtp.gmail.com", 465),
+        ("login", "alertes@exemple.test"),
+    ]
 
 
 def test_destinataire_par_defaut_est_le_compte_d_envoi(monkeypatch, faux_smtp):

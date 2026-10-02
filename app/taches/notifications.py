@@ -8,13 +8,14 @@ sans elles, la notification est simplement désactivée et rien d'autre ne chang
     WORKLY_SMTP_MOT_DE_PASSE  mot de passe d'application (obligatoire)
     WORKLY_ALERTE_DESTINATAIRE  adresse qui reçoit les alertes (défaut : le compte d'envoi)
     WORKLY_SMTP_HOTE          défaut smtp.gmail.com
-    WORKLY_SMTP_PORT          défaut 587 (STARTTLS)
+    WORKLY_SMTP_PORT          défaut 587 (STARTTLS) ; 465 = SSL direct (si 587 est bloqué)
 """
 
 from __future__ import annotations
 
 import os
 import smtplib
+import ssl
 from datetime import datetime
 from email.message import EmailMessage
 
@@ -53,8 +54,18 @@ def envoyer(sujet: str, corps: str) -> bool:
     message["To"] = reglages["destinataire"]
     message.set_content(corps)
     try:
-        with smtplib.SMTP(reglages["hote"], reglages["port"], timeout=DELAI_SMTP_S) as smtp:
-            smtp.starttls()
+        if reglages["port"] == 465:
+            connexion = smtplib.SMTP_SSL(
+                reglages["hote"],
+                reglages["port"],
+                timeout=DELAI_SMTP_S,
+                context=ssl.create_default_context(),
+            )
+        else:
+            connexion = smtplib.SMTP(reglages["hote"], reglages["port"], timeout=DELAI_SMTP_S)
+        with connexion as smtp:
+            if reglages["port"] != 465:
+                smtp.starttls(context=ssl.create_default_context())
             smtp.login(reglages["utilisateur"], reglages["mot_de_passe"])
             smtp.send_message(message)
     except (TimeoutError, smtplib.SMTPException, OSError) as exc:
