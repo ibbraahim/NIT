@@ -175,3 +175,46 @@ def test_alerte_sans_messagerie_configuree_repond_echec(adresse, monkeypatch):
     monkeypatch.setattr(notifications, "envoyer", lambda sujet, corps: False)
     code, corps = appeler(adresse, "/alerte?etape=import", "POST")
     assert code == 500 and corps["statut"] == "echec"
+
+
+@pytest.mark.parametrize(
+    ("jour", "attendu"),
+    [
+        ((2026, 10, 7), []),  # un mercredi ordinaire : rien
+        ((2026, 10, 4), ["capacites_semaine"]),  # dimanche
+        ((2026, 10, 12), ["hebdomadaire"]),  # lundi
+        ((2026, 11, 1), ["capacites_semaine", "mensuel"]),  # dimanche 1er novembre
+        ((2026, 6, 1), ["hebdomadaire", "mensuel"]),  # lundi 1er juin : jamais en parallèle
+        ((2027, 1, 1), ["mensuel", "annuel"]),  # vendredi 1er janvier
+    ],
+)
+def test_taches_dues_selon_la_date(jour, attendu):
+    from datetime import UTC, datetime
+
+    assert serveur.taches_dues(datetime(*jour, 0, 30, tzinfo=UTC)) == attendu
+
+
+def test_taches_du_jour_s_arrete_a_la_premiere_erreur(adresse, monkeypatch):
+
+    appelees = []
+
+    def faux(nom):
+        appelees.append(nom)
+        return {"tache": nom, "statut": "echec" if nom == "hebdomadaire" else "succes"}
+
+    monkeypatch.setattr(serveur, "executer_et_mesurer", faux)
+    monkeypatch.setattr(
+        serveur,
+        "taches_dues",
+        lambda maintenant=None: ["hebdomadaire", "mensuel"],
+    )
+    code, corps = appeler(adresse, "/taches-du-jour", "POST")
+    assert code == 500 and corps["etape_en_echec"] == "hebdomadaire"
+    assert appelees == ["hebdomadaire"]  # le mensuel n'est pas lancé
+
+
+def test_taches_du_jour_sans_tache_due_reussit(adresse, monkeypatch):
+    monkeypatch.setattr(serveur, "taches_dues", lambda maintenant=None: [])
+    code, corps = appeler(adresse, "/taches-du-jour", "POST")
+    assert code == 200 and corps == {"statut": "succes", "taches_dues": [], "etapes": []}
+    assert appeler(adresse, "/taches-du-jour", "POST", jeton=None)[0] == 401

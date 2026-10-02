@@ -15,6 +15,9 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
                               janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
     POST /alerte?etape=<nom>  envoie un e-mail « échec de l'étape <nom> » (alerte d'un workflow)
+    POST /taches-du-jour      lance, dans l'ordre, les tâches dues aujourd'hui (UTC) : dimanche
+                              → capacites_semaine, lundi → hebdomadaire, le 1er → mensuel, le
+                              1er janvier → annuel ; arrêt à la première erreur
     POST /cycle-nocturne      import → comparaison → KPI → alertes → prévisions → rapport,
                               arrêt à la première erreur
 """
@@ -64,6 +67,35 @@ def aujourdhui(maintenant: datetime | None = None) -> dict:
         "est_premier_du_mois": maintenant.day == 1,
         "est_premier_janvier": maintenant.day == 1 and maintenant.month == 1,
     }
+
+
+def taches_dues(maintenant: datetime | None = None) -> list[str]:
+    """Tâches périodiques à lancer aujourd'hui (UTC), dans un ordre fixe : la reconduction des
+    capacités le dimanche, puis l'hebdomadaire le lundi, le mensuel le 1er, l'annuel le 1er
+    janvier. Un lundi 1er enchaîne donc hebdomadaire puis mensuel, jamais en parallèle."""
+    jour = aujourdhui(maintenant)
+    dues = []
+    if jour["est_dimanche"]:
+        dues.append("capacites_semaine")
+    if jour["est_lundi"]:
+        dues.append("hebdomadaire")
+    if jour["est_premier_du_mois"]:
+        dues.append("mensuel")
+    if jour["est_premier_janvier"]:
+        dues.append("annuel")
+    return dues
+
+
+def executer_taches_du_jour(maintenant: datetime | None = None) -> dict:
+    """Exécute les tâches dues aujourd'hui ; s'arrête à la première qui échoue."""
+    dues = taches_dues(maintenant)
+    etapes = []
+    for nom in dues:
+        resultat = executer_et_mesurer(nom)
+        etapes.append(resultat)
+        if resultat["statut"] != "succes":
+            return {"statut": "echec", "taches_dues": dues, "etape_en_echec": nom, "etapes": etapes}
+    return {"statut": "succes", "taches_dues": dues, "etapes": etapes}
 
 
 def nettoyer_etape(valeur: str) -> str:
@@ -190,6 +222,9 @@ def fabriquer_gestionnaire(jeton: str):
                 return
             if self.path == "/cycle-nocturne":
                 self._executer_exclusif(executer_cycle)
+                return
+            if self.path == "/taches-du-jour":
+                self._executer_exclusif(executer_taches_du_jour)
                 return
             if self.path.startswith("/taches/"):
                 from app.taches.planificateur import TACHES
