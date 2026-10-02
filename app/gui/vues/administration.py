@@ -43,6 +43,7 @@ from app.utils.format_fr import (
 
 OPTIONS_ROLES = [(r, LIBELLES_ROLES[r]) for r in ROLES_UTILISATEUR]
 LIBELLES_TACHES = {
+    "sauvegarde_base": "Sauvegarder la base de données",
     "import_historique": "Importer l'historique déposé (UC04, UC06)",
     "import_previsions_volume": "Importer les prévisions de volume déposées (UC05, UC06)",
     "comparaison_quotidienne": "Comparer le réalisé aux prévisions et détecter une dérive "

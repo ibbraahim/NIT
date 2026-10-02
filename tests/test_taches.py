@@ -41,6 +41,14 @@ def test_executer_tache_journalise_l_echec(bd_vierge, monkeypatch):
     assert "panne simulée" in journal[0]["message"]
 
 
+@pytest.fixture(autouse=True)
+def sans_vraie_sauvegarde(monkeypatch):
+    """Les tests n'écrivent jamais de vraie sauvegarde dans le dossier du projet."""
+    from app.taches import planificateur
+
+    monkeypatch.setattr(planificateur, "sauvegarder_base", lambda: "Sauvegarde simulée.")
+
+
 def test_toutes_les_taches_s_executent_sans_site(bd_vierge):
     """Aucun site en base : chaque tâche doit renvoyer un message, pas planter."""
     for nom in TACHES:

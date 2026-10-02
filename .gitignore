@@ -6,6 +6,7 @@ __pycache__/
 config.ini
 journaux/*
 rapports/*
+sauvegardes/*
 modeles_enregistres/*
 entrees/historique/*
 entrees/previsions/*

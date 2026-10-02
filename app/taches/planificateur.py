@@ -1,9 +1,11 @@
 """Tâches automatiques : APScheduler (``BackgroundScheduler``) et journalisation dans
 ``journal_taches``.
 
-Onze tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
+Douze tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
 de tâches »), pour chaque site :
 
+- ``sauvegarde_base`` (00:30) — sauvegarde ``pg_dump`` de la base, 14 copies conservées
+  (voir ``app/taches/sauvegarde.py``).
 - ``import_historique`` (01:00) — UC04 (import) + UC06, sur les fichiers déposés dans
   ``entrees/historique/``, déplacés ensuite vers ``entrees/traites/``.
 - ``import_previsions_volume`` (01:10) — UC05 (import) + UC06, sur les fichiers déposés dans
@@ -63,6 +65,7 @@ from app.services import (
 )
 from app.services.modeles import DEFAUT_PARAMETRES
 from app.taches.notifications import notifier_echec
+from app.taches.sauvegarde import sauvegarder_base
 from app.utils.fichiers_excel import EXTENSIONS_PRISES_EN_CHARGE
 
 _log = journal(__name__)
@@ -80,6 +83,7 @@ JOURS_CRON = {
 #: Fréquence des tâches à horaire fixe (tableau de l'écran Administration, onglet Tâches).
 #: ``hebdomadaire`` n'y figure pas : son jour et son heure sont configurables (UC07).
 FREQUENCES_FIXES = {
+    "sauvegarde_base": "Chaque jour à 00:30",
     "import_historique": "Chaque jour à 01:00",
     "import_previsions_volume": "Chaque jour à 01:10",
     "comparaison_quotidienne": "Chaque jour à 01:30",
@@ -147,7 +151,7 @@ def _generer_rapports(periodicite: str, format_rapport: str = "pdf_excel") -> in
 
 
 # =====================================================================
-# Les onze tâches automatiques
+# Les douze tâches automatiques
 # =====================================================================
 def _importer_dossier(dossier: Path, importer: Callable, enregistrer: Callable) -> str:
     """Importe chaque fichier d'un dossier de dépôt (UC06 appliqué par ``importer``), enregistre
@@ -176,6 +180,11 @@ def _importer_dossier(dossier: Path, importer: Callable, enregistrer: Callable) 
         f"valide(s), {total_rejetees} rejetée(s), {total_avertissements} avertissement(s)"
     )
     return message + (f", {echecs} fichier(s) illisible(s)." if echecs else ".")
+
+
+def tache_sauvegarde_base() -> str:
+    """Sauvegarde de la base PostgreSQL, avec purge des anciennes copies."""
+    return sauvegarder_base()
 
 
 def tache_import_historique() -> str:
@@ -282,6 +291,7 @@ def tache_annuel() -> str:
 
 
 TACHES: dict[str, Callable[[], str]] = {
+    "sauvegarde_base": tache_sauvegarde_base,
     "import_historique": tache_import_historique,
     "import_previsions_volume": tache_import_previsions_volume,
     "comparaison_quotidienne": tache_comparaison_quotidienne,
@@ -339,6 +349,12 @@ class Planificateur:
         self._programmer()
 
     def _programmer(self) -> None:
+        self._scheduler.add_job(
+            lambda: executer_tache("sauvegarde_base"),
+            CronTrigger(hour=0, minute=30),
+            id="sauvegarde_base",
+            replace_existing=True,
+        )
         self._scheduler.add_job(
             lambda: executer_tache("import_historique"),
             CronTrigger(hour=1, minute=0),

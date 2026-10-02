@@ -65,7 +65,7 @@ Tâches).
 | Appel | Effet | Réponses |
 |---|---|---|
 | `GET /sante` | vivacité (sans jeton) | 200 `{"ok": true}` |
-| `GET /taches` | liste des 11 tâches et du cycle nocturne | 200, 401 |
+| `GET /taches` | liste des 12 tâches et du cycle nocturne | 200, 401 |
 | `POST /taches/<nom>` | exécute une tâche | 200 succès, 500 échec, 404 inconnue, 401 jeton, 409 déjà en cours |
 | `POST /cycle-nocturne` | enchaîne import → comparaison → KPI → alertes → prévisions → rapport, s'arrête à la première erreur | 200 ou 500 avec `etape_en_echec` |
 
@@ -151,6 +151,14 @@ Reconduit les effectifs et absences prévus de la semaine en cours vers la semai
 chaque site, **sans jamais écraser** une semaine déjà renseignée. Cette tâche utilise un droit
 dédié (`reconduction_capacites`) : le planificateur de tâches n'a pas accès au reste de la
 gestion des référentiels.
+
+### Scénario 3 ter — « Workly · Sauvegarde »
+
+Cron `30 0 * * *` ; appel `POST /taches/sauvegarde_base`, délai 15 min. Crée
+`sauvegardes/workly_AAAAMMJJ_HHMMSS.dump` (14 copies conservées, réglable par
+`WORKLY_SAUVEGARDES_CONSERVEES`). `pg_dump` est cherché par `WORKLY_PG_DUMP`, le `PATH`, puis
+`C:\Program Files\PostgreSQL\*\bin`. Restauration :
+`pg_restore --clean --if-exists -d <base> sauvegardes/<fichier>.dump`.
 
 ### Scénario 4 — « Workly · Mensuel »
 

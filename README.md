@@ -102,6 +102,7 @@ Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administrat
 
 | Tâche | Cas d'utilisation | Fréquence par défaut |
 |---|---|---|
+| `sauvegarde_base` | sauvegarde `pg_dump` (14 copies) | quotidienne, 00:30 |
 | `import_historique` | UC04 (import), UC06 | quotidienne, 01:00 |
 | `import_previsions_volume` | UC05 (import), UC06 | quotidienne, 01:10 |
 | `capacites_semaine` | UC03 (reconduction des capacités) | dimanche, 04:30 |
