@@ -56,6 +56,8 @@ class Colonne:
     alignement: str = "w"
     formateur: Callable[[object], str] | None = None
     etirable: bool = True
+    #: Largeur maximale de l'ajustement automatique (``None`` : ``_LARGEUR_MAX_COLONNE``).
+    largeur_max: int | None = None
 
 
 def _texte(valeur, formateur) -> str:
@@ -212,7 +214,7 @@ class TableauTriable(ttk.Frame):
                 (police.measure(str(self.arbre.set(iid, colonne.cle))) for iid in identifiants),
                 default=0,
             )
-            besoin = min(contenu + 28, _LARGEUR_MAX_COLONNE)
+            besoin = min(contenu + 28, colonne.largeur_max or _LARGEUR_MAX_COLONNE)
             actuelle = int(self.arbre.column(colonne.cle, "width"))
             if besoin > max(actuelle, colonne.largeur):
                 self.arbre.column(colonne.cle, width=besoin, minwidth=besoin)

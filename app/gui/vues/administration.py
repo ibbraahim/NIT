@@ -59,6 +59,23 @@ LIBELLES_TACHES = {
     "annuel": "Calculer les KPI et générer le rapport annuel (UC17, UC23)",
 }
 
+#: Ordre et étape du pipeline automatique piloté de l'extérieur (Fusion, n8n) : une étape par
+#: tâche quotidienne, puis les tâches périodiques que « Tâches du jour » lance selon la date.
+PIPELINE = {
+    "sauvegarde_base": "P1",
+    "import_historique": "P2",
+    "import_previsions_volume": "P3",
+    "comparaison_quotidienne": "P4",
+    "kpi_quotidiens": "P5",
+    "alertes_capacite": "P6",
+    "previsions_quotidiennes": "P7",
+    "rapport_quotidien": "P8",
+    "capacites_semaine": "P9 · dim.",
+    "hebdomadaire": "P9 · lun.",
+    "mensuel": "P9 · 1er mois",
+    "annuel": "P9 · 1er janv.",
+}
+
 OPTIONS_TYPES = list(TYPES_EQUIPEMENT.items())
 OPTIONS_STATUTS = list(STATUTS_EQUIPEMENT.items())
 
@@ -984,7 +1001,15 @@ class OngletTaches(Onglet):
     def construire(self) -> None:
         carte_etat = self.carte("Planificateur", "Exécution automatique des tâches")
         self.etat_planificateur = ttk.Label(carte_etat.zone, text="", style="Gras.TLabel")
-        self.etat_planificateur.pack(anchor="w", pady=(0, 10))
+        self.etat_planificateur.pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            carte_etat.zone,
+            text="Ces tâches peuvent aussi être lancées de l'extérieur (plateforme Fusion, n8n) par "
+            "le point d'accès HTTP : leur exécution apparaît alors ici et dans le journal.",
+            style="Aide.TLabel",
+            wraplength=900,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
         barre2 = ttk.Frame(carte_etat.zone)
         barre2.pack(fill="x")
         self.b_demarrer = Bouton(barre2, "Démarrer le planificateur", self.demarrer)
@@ -1005,17 +1030,24 @@ class OngletTaches(Onglet):
         self.tableau = TableauTriable(
             carte.zone,
             [
-                Colonne("tache_libelle", "Tâche", 320),
-                Colonne("frequence", "Fréquence", 190),
+                Colonne("pipeline", "Pipeline", 100, "center"),
+                Colonne("tache_libelle", "Tâche", 300, largeur_max=300),
+                Colonne("frequence", "Fréquence", 160, largeur_max=200),
                 Colonne(
-                    "prochaine_execution",
-                    "Prochaine exécution",
-                    150,
+                    "derniere_execution",
+                    "Dernière exécution",
+                    135,
                     "center",
                     formateur=formater_date_heure,
                 ),
-                Colonne("dernier_statut_libelle", "Dernier statut", 110, "center"),
-                Colonne("derniere_duree", "Dernière durée", 100, "e"),
+                Colonne(
+                    "prochaine_execution",
+                    "Prochaine exécution",
+                    130,
+                    "center",
+                    formateur=formater_date_heure,
+                ),
+                Colonne("dernier_statut_libelle", "Dernier statut", 100, "center"),
             ],
             hauteur=12,
         )
@@ -1048,7 +1080,7 @@ class OngletTaches(Onglet):
         dernieres = self.vue.executer(lambda: admin.dernieres_executions_taches(self.ctx)) or {}
         etiquettes = {"succes": "vert", "echec": "rouge", "en_cours": "orange"}
         lignes = []
-        for nom in TACHES:
+        for nom in sorted(TACHES, key=lambda n: list(PIPELINE).index(n) if n in PIPELINE else 99):
             derniere = dernieres.get(nom)
             duree = None
             if derniere and derniere["fin"] is not None:
@@ -1057,6 +1089,8 @@ class OngletTaches(Onglet):
             lignes.append(
                 {
                     "id": nom,
+                    "pipeline": PIPELINE.get(nom, "—"),
+                    "derniere_execution": derniere["debut"] if derniere else None,
                     "tache_libelle": LIBELLES_TACHES.get(nom, nom),
                     "frequence": frequences.get(nom, "—"),
                     "prochaine_execution": datetime.fromisoformat(prochaine) if prochaine else None,

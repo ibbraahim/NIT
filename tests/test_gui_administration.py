@@ -103,6 +103,15 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     assert len(lignes) == 12
     assert all(l["dernier_statut_libelle"] == "Jamais exécutée" for l in lignes)
     assert all(l["frequence"] for l in lignes)
+    # Les tâches sont rangées dans l'ordre du pipeline : P1 (sauvegarde) à P8, puis P9.
+    assert [l["id"] for l in lignes][:3] == [
+        "sauvegarde_base",
+        "import_historique",
+        "import_previsions_volume",
+    ]
+    assert lignes[0]["pipeline"] == "P1" and lignes[7]["pipeline"] == "P8"
+    assert all(l["pipeline"].startswith("P9") for l in lignes[8:])
+    assert all(l["derniere_execution"] is None for l in lignes)
 
     taches.tableau.selectionner("kpi_quotidiens")
     application.racine.update()
@@ -123,6 +132,7 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     kpi_ligne = next(l for l in lignes if l["id"] == "kpi_quotidiens")
     assert kpi_ligne["dernier_statut_libelle"] == "Succès"
     assert kpi_ligne["derniere_duree"] != "—"
+    assert kpi_ligne["derniere_execution"] is not None
 
     from app.gui.vues.administration import FenetreJournalTaches
 
