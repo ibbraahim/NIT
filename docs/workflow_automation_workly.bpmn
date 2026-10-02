@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Auto" targetNamespace="http://workly.local/bpmn" exporter="Workly" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_Auto">
+    <bpmn:participant id="Pool_Auto" name="Fusion AI Automation — workflow « Workly Automation »" processRef="Process_Auto" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Auto" name="Workly Automation" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Auto">
+      <bpmn:lane id="lane_decl" name="Déclencheurs">
+        <bpmn:flowNodeRef>cron_pipe</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>manuel</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_pipe" name="Pipeline nocturne (chaîne HTTP vers Workly)">
+        <bpmn:flowNodeRef>sante</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_sante</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>p9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_p9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>fin</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_alerte" name="Alertes par e-mail (envoyées par Workly)">
+        <bpmn:flowNodeRef>stop_sante</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_p9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>x_p9</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_surv" name="Surveillance (toutes les 10 minutes)">
+        <bpmn:flowNodeRef>cron_surv</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>surv</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>surv_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_surv</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>surv_rouge</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="cron_pipe" name="Cron pipeline&#10;00:30 UTC">
+      <bpmn:documentation>Planification de la plateforme : 30 0 * * * (tous les jours à 00:30 UTC, 01:30 au Maroc). Actif dès l'enregistrement du workflow.</bpmn:documentation>
+      <bpmn:outgoing>Flow_0</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_cron_pipe" />
+    </bpmn:startEvent>
+    <bpmn:startEvent id="manuel" name="Manual Trigger&#10;(bouton ▷)">
+      <bpmn:documentation>Lancement à la main pour tester ou rattraper une nuit.</bpmn:documentation>
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="sante" name="Workly sante">
+      <bpmn:documentation>GET https://condone-dragonfly-coveting.ngrok-free.dev/sante (sans jeton). Si Workly ne répond pas, le pipeline s'arrête.</bpmn:documentation>
+      <bpmn:incoming>Flow_0</bpmn:incoming>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="stop_sante" name="Workly injoignable :&#10;arrêt">
+      <bpmn:documentation>Aucun e-mail : c'est Workly qui envoie les e-mails.</bpmn:documentation>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="b_sante" attachedToRef="sante" cancelActivity="true">
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_sante" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="p1" name="P1 Sauvegarde">
+      <bpmn:documentation>POST /taches/sauvegarde_base. Délai 900000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p1" attachedToRef="p1" cancelActivity="true">
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p1" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p1" name="Alerte e-mail&#10;échec P1">
+      <bpmn:documentation>POST /alerte?etape=sauvegarde : Workly envoie l'e-mail « échec de l'étape sauvegarde ».</bpmn:documentation>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="p2" name="P2 Import historique">
+      <bpmn:documentation>POST /taches/import_historique. Délai 600000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p2" attachedToRef="p2" cancelActivity="true">
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p2" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p2" name="Alerte e-mail&#10;échec P2">
+      <bpmn:documentation>POST /alerte?etape=import_historique : Workly envoie l'e-mail « échec de l'étape import_historique ».</bpmn:documentation>
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p2" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p3" name="P3 Import prévisions">
+      <bpmn:documentation>POST /taches/import_previsions_volume. Délai 600000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p3" attachedToRef="p3" cancelActivity="true">
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p3" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p3" name="Alerte e-mail&#10;échec P3">
+      <bpmn:documentation>POST /alerte?etape=import_previsions_volume : Workly envoie l'e-mail « échec de l'étape import_previsions_volume ».</bpmn:documentation>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p3" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p4" name="P4 Comparaison">
+      <bpmn:documentation>POST /taches/comparaison_quotidienne. Délai 900000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p4" attachedToRef="p4" cancelActivity="true">
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p4" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p4" name="Alerte e-mail&#10;échec P4">
+      <bpmn:documentation>POST /alerte?etape=comparaison_quotidienne : Workly envoie l'e-mail « échec de l'étape comparaison_quotidienne ».</bpmn:documentation>
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p4" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p5" name="P5 KPI du jour">
+      <bpmn:documentation>POST /taches/kpi_quotidiens. Délai 900000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p5" attachedToRef="p5" cancelActivity="true">
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p5" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p5" name="Alerte e-mail&#10;échec P5">
+      <bpmn:documentation>POST /alerte?etape=kpi_quotidiens : Workly envoie l'e-mail « échec de l'étape kpi_quotidiens ».</bpmn:documentation>
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p5" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p6" name="P6 Alertes de capacité">
+      <bpmn:documentation>POST /taches/alertes_capacite. Délai 300000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p6" attachedToRef="p6" cancelActivity="true">
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p6" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p6" name="Alerte e-mail&#10;échec P6">
+      <bpmn:documentation>POST /alerte?etape=alertes_capacite : Workly envoie l'e-mail « échec de l'étape alertes_capacite ».</bpmn:documentation>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p6" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p7" name="P7 Prévisions J+1 à J+14">
+      <bpmn:documentation>POST /taches/previsions_quotidiennes. Délai 1800000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p7" attachedToRef="p7" cancelActivity="true">
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p7" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p7" name="Alerte e-mail&#10;échec P7">
+      <bpmn:documentation>POST /alerte?etape=previsions_quotidiennes : Workly envoie l'e-mail « échec de l'étape previsions_quotidiennes ».</bpmn:documentation>
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p7" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p8" name="P8 Rapport du jour">
+      <bpmn:documentation>POST /taches/rapport_quotidien. Délai 1800000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p8" attachedToRef="p8" cancelActivity="true">
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p8" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p8" name="Alerte e-mail&#10;échec P8">
+      <bpmn:documentation>POST /alerte?etape=rapport_quotidien : Workly envoie l'e-mail « échec de l'étape rapport_quotidien ».</bpmn:documentation>
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+      <bpmn:outgoing>Flow_28</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p8" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_28</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="p9" name="P9 Tâches du jour">
+      <bpmn:documentation>POST /taches-du-jour. Délai 3600000 ms. En-têtes : Authorization: Bearer &lt;jeton&gt;, ngrok-skip-browser-warning: true.</bpmn:documentation>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="b_p9" attachedToRef="p9" cancelActivity="true">
+      <bpmn:outgoing>Flow_29</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_p9" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="a_p9" name="Alerte e-mail&#10;échec P9">
+      <bpmn:documentation>POST /alerte?etape=taches_du_jour : Workly envoie l'e-mail « échec de l'étape taches_du_jour ».</bpmn:documentation>
+      <bpmn:incoming>Flow_29</bpmn:incoming>
+      <bpmn:outgoing>Flow_30</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="x_p9" name="Pipeline arrêté">
+      <bpmn:incoming>Flow_30</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="fin" name="Pipeline terminé">
+      <bpmn:documentation>Le lundi 1er, l'hebdomadaire passe avant le mensuel : jamais en parallèle (verrou de Workly).</bpmn:documentation>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="cron_surv" name="Cron surveillance&#10;*/10 * * * *">
+      <bpmn:documentation>Toutes les 10 minutes.</bpmn:documentation>
+      <bpmn:outgoing>Flow_31</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_cron_surv" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="surv" name="Surveillance">
+      <bpmn:documentation>GET https://condone-dragonfly-coveting.ngrok-free.dev/sante, délai 10 000 ms.</bpmn:documentation>
+      <bpmn:incoming>Flow_31</bpmn:incoming>
+      <bpmn:outgoing>Flow_32</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="surv_ok" name="Workly répond">
+      <bpmn:incoming>Flow_32</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="b_surv" attachedToRef="surv" cancelActivity="true">
+      <bpmn:outgoing>Flow_33</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Err_b_surv" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="surv_rouge" name="Rouge : serveur ou ngrok&#10;arrêté (non signalé)">
+      <bpmn:documentation>Aucune alerte n'arrive aujourd'hui : voir le point « battement de cœur » dans la documentation.</bpmn:documentation>
+      <bpmn:incoming>Flow_33</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0" sourceRef="cron_pipe" targetRef="sante" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="manuel" targetRef="sante" />
+    <bpmn:sequenceFlow id="Flow_2" name="OK" sourceRef="sante" targetRef="p1" />
+    <bpmn:sequenceFlow id="Flow_3" name="échec" sourceRef="b_sante" targetRef="stop_sante" />
+    <bpmn:sequenceFlow id="Flow_4" name="OK" sourceRef="p1" targetRef="p2" />
+    <bpmn:sequenceFlow id="Flow_5" name="OK" sourceRef="p2" targetRef="p3" />
+    <bpmn:sequenceFlow id="Flow_6" name="OK" sourceRef="p3" targetRef="p4" />
+    <bpmn:sequenceFlow id="Flow_7" name="OK" sourceRef="p4" targetRef="p5" />
+    <bpmn:sequenceFlow id="Flow_8" name="OK" sourceRef="p5" targetRef="p6" />
+    <bpmn:sequenceFlow id="Flow_9" name="OK" sourceRef="p6" targetRef="p7" />
+    <bpmn:sequenceFlow id="Flow_10" name="OK" sourceRef="p7" targetRef="p8" />
+    <bpmn:sequenceFlow id="Flow_11" name="OK" sourceRef="p8" targetRef="p9" />
+    <bpmn:sequenceFlow id="Flow_12" name="OK" sourceRef="p9" targetRef="fin" />
+    <bpmn:sequenceFlow id="Flow_13" name="échec" sourceRef="b_p1" targetRef="a_p1" />
+    <bpmn:sequenceFlow id="Flow_14" name="continue" sourceRef="a_p1" targetRef="p2" />
+    <bpmn:sequenceFlow id="Flow_15" name="échec" sourceRef="b_p2" targetRef="a_p2" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="a_p2" targetRef="x_p2" />
+    <bpmn:sequenceFlow id="Flow_17" name="échec" sourceRef="b_p3" targetRef="a_p3" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="a_p3" targetRef="x_p3" />
+    <bpmn:sequenceFlow id="Flow_19" name="échec" sourceRef="b_p4" targetRef="a_p4" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="a_p4" targetRef="x_p4" />
+    <bpmn:sequenceFlow id="Flow_21" name="échec" sourceRef="b_p5" targetRef="a_p5" />
+    <bpmn:sequenceFlow id="Flow_22" sourceRef="a_p5" targetRef="x_p5" />
+    <bpmn:sequenceFlow id="Flow_23" name="échec" sourceRef="b_p6" targetRef="a_p6" />
+    <bpmn:sequenceFlow id="Flow_24" sourceRef="a_p6" targetRef="x_p6" />
+    <bpmn:sequenceFlow id="Flow_25" name="échec" sourceRef="b_p7" targetRef="a_p7" />
+    <bpmn:sequenceFlow id="Flow_26" sourceRef="a_p7" targetRef="x_p7" />
+    <bpmn:sequenceFlow id="Flow_27" name="échec" sourceRef="b_p8" targetRef="a_p8" />
+    <bpmn:sequenceFlow id="Flow_28" sourceRef="a_p8" targetRef="x_p8" />
+    <bpmn:sequenceFlow id="Flow_29" name="échec" sourceRef="b_p9" targetRef="a_p9" />
+    <bpmn:sequenceFlow id="Flow_30" sourceRef="a_p9" targetRef="x_p9" />
+    <bpmn:sequenceFlow id="Flow_31" sourceRef="cron_surv" targetRef="surv" />
+    <bpmn:sequenceFlow id="Flow_32" name="OK" sourceRef="surv" targetRef="surv_ok" />
+    <bpmn:sequenceFlow id="Flow_33" name="échec" sourceRef="b_surv" targetRef="surv_rouge" />
+    <bpmn:textAnnotation id="ann1"><bpmn:text>P9 : Workly lance selon la date UTC, dans l'ordre :
+dimanche → capacités ; lundi → hebdomadaire ;
+le 1er → mensuel ; 1er janvier → annuel.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Assoc_ann1" sourceRef="p9" targetRef="ann1" />
+    <bpmn:textAnnotation id="ann2"><bpmn:text>Chaque appel (sauf /sante) exige le jeton Bearer,
+sinon 401. Un chemin doublé donne 404.
+Horaires en UTC (Maroc : +1 h).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Assoc_ann2" sourceRef="p5" targetRef="ann2" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Auto">
+    <bpmndi:BPMNPlane id="Plane_Auto" bpmnElement="Collab_Auto">
+      <bpmndi:BPMNShape id="Pool_Auto_di" bpmnElement="Pool_Auto" isHorizontal="true"><dc:Bounds x="0" y="0" width="2260" height="805" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_decl_di" bpmnElement="lane_decl" isHorizontal="true"><dc:Bounds x="30" y="0" width="2230" height="175" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_pipe_di" bpmnElement="lane_pipe" isHorizontal="true"><dc:Bounds x="30" y="175" width="2230" height="170" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_alerte_di" bpmnElement="lane_alerte" isHorizontal="true"><dc:Bounds x="30" y="345" width="2230" height="210" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_surv_di" bpmnElement="lane_surv" isHorizontal="true"><dc:Bounds x="30" y="555" width="2230" height="250" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="cron_pipe_di" bpmnElement="cron_pipe"><dc:Bounds x="112" y="20" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="60" y="60" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="manuel_di" bpmnElement="manuel"><dc:Bounds x="112" y="100" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="60" y="140" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sante_di" bpmnElement="sante"><dc:Bounds x="218" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="stop_sante_di" bpmnElement="stop_sante"><dc:Bounds x="262" y="407" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="210" y="447" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_sante_di" bpmnElement="b_sante"><dc:Bounds x="262" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p1_di" bpmnElement="p1"><dc:Bounds x="368" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p1_di" bpmnElement="b_p1"><dc:Bounds x="412" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p1_di" bpmnElement="a_p1"><dc:Bounds x="368" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p2_di" bpmnElement="p2"><dc:Bounds x="518" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p2_di" bpmnElement="b_p2"><dc:Bounds x="562" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p2_di" bpmnElement="a_p2"><dc:Bounds x="518" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p2_di" bpmnElement="x_p2"><dc:Bounds x="562" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="510" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p3_di" bpmnElement="p3"><dc:Bounds x="668" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p3_di" bpmnElement="b_p3"><dc:Bounds x="712" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p3_di" bpmnElement="a_p3"><dc:Bounds x="668" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p3_di" bpmnElement="x_p3"><dc:Bounds x="712" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="660" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p4_di" bpmnElement="p4"><dc:Bounds x="818" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p4_di" bpmnElement="b_p4"><dc:Bounds x="862" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p4_di" bpmnElement="a_p4"><dc:Bounds x="818" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p4_di" bpmnElement="x_p4"><dc:Bounds x="862" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="810" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p5_di" bpmnElement="p5"><dc:Bounds x="968" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p5_di" bpmnElement="b_p5"><dc:Bounds x="1012" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p5_di" bpmnElement="a_p5"><dc:Bounds x="968" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p5_di" bpmnElement="x_p5"><dc:Bounds x="1012" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="960" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p6_di" bpmnElement="p6"><dc:Bounds x="1118" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p6_di" bpmnElement="b_p6"><dc:Bounds x="1162" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p6_di" bpmnElement="a_p6"><dc:Bounds x="1118" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p6_di" bpmnElement="x_p6"><dc:Bounds x="1162" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1110" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p7_di" bpmnElement="p7"><dc:Bounds x="1268" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p7_di" bpmnElement="b_p7"><dc:Bounds x="1312" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p7_di" bpmnElement="a_p7"><dc:Bounds x="1268" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p7_di" bpmnElement="x_p7"><dc:Bounds x="1312" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1260" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p8_di" bpmnElement="p8"><dc:Bounds x="1418" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p8_di" bpmnElement="b_p8"><dc:Bounds x="1462" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p8_di" bpmnElement="a_p8"><dc:Bounds x="1418" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p8_di" bpmnElement="x_p8"><dc:Bounds x="1462" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1410" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p9_di" bpmnElement="p9"><dc:Bounds x="1568" y="225" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_p9_di" bpmnElement="b_p9"><dc:Bounds x="1612" y="277" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_p9_di" bpmnElement="a_p9"><dc:Bounds x="1568" y="390" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="x_p9_di" bpmnElement="x_p9"><dc:Bounds x="1612" y="497" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1560" y="537" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fin_di" bpmnElement="fin"><dc:Bounds x="1762" y="242" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1710" y="282" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="cron_surv_di" bpmnElement="cron_surv"><dc:Bounds x="112" y="622" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="60" y="662" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="surv_di" bpmnElement="surv"><dc:Bounds x="258" y="605" width="124" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="surv_ok_di" bpmnElement="surv_ok"><dc:Bounds x="492" y="622" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="440" y="662" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_surv_di" bpmnElement="b_surv"><dc:Bounds x="302" y="657" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="surv_rouge_di" bpmnElement="surv_rouge"><dc:Bounds x="302" y="727" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="250" y="767" width="140" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0_di" bpmnElement="Flow_0">
+        <di:waypoint x="148" y="38" />
+        <di:waypoint x="258" y="38" />
+        <di:waypoint x="258" y="225" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="148" y="118" />
+        <di:waypoint x="302" y="118" />
+        <di:waypoint x="302" y="225" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="342" y="260" />
+        <di:waypoint x="368" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="280" y="313" />
+        <di:waypoint x="280" y="407" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="492" y="260" />
+        <di:waypoint x="518" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="642" y="260" />
+        <di:waypoint x="668" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="792" y="260" />
+        <di:waypoint x="818" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="942" y="260" />
+        <di:waypoint x="968" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1092" y="260" />
+        <di:waypoint x="1118" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1242" y="260" />
+        <di:waypoint x="1268" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1392" y="260" />
+        <di:waypoint x="1418" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1542" y="260" />
+        <di:waypoint x="1568" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1692" y="260" />
+        <di:waypoint x="1762" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="430" y="313" />
+        <di:waypoint x="430" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="492" y="425" />
+        <di:waypoint x="503" y="425" />
+        <di:waypoint x="503" y="260" />
+        <di:waypoint x="518" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="580" y="313" />
+        <di:waypoint x="580" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="580" y="460" />
+        <di:waypoint x="580" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="730" y="313" />
+        <di:waypoint x="730" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="730" y="460" />
+        <di:waypoint x="730" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="880" y="313" />
+        <di:waypoint x="880" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="880" y="460" />
+        <di:waypoint x="880" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="1030" y="313" />
+        <di:waypoint x="1030" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="1030" y="460" />
+        <di:waypoint x="1030" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="1180" y="313" />
+        <di:waypoint x="1180" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24">
+        <di:waypoint x="1180" y="460" />
+        <di:waypoint x="1180" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25">
+        <di:waypoint x="1330" y="313" />
+        <di:waypoint x="1330" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26">
+        <di:waypoint x="1330" y="460" />
+        <di:waypoint x="1330" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27">
+        <di:waypoint x="1480" y="313" />
+        <di:waypoint x="1480" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_28_di" bpmnElement="Flow_28">
+        <di:waypoint x="1480" y="460" />
+        <di:waypoint x="1480" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_29_di" bpmnElement="Flow_29">
+        <di:waypoint x="1630" y="313" />
+        <di:waypoint x="1630" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_30_di" bpmnElement="Flow_30">
+        <di:waypoint x="1630" y="460" />
+        <di:waypoint x="1630" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_31_di" bpmnElement="Flow_31">
+        <di:waypoint x="148" y="640" />
+        <di:waypoint x="258" y="640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_32_di" bpmnElement="Flow_32">
+        <di:waypoint x="382" y="640" />
+        <di:waypoint x="492" y="640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_33_di" bpmnElement="Flow_33">
+        <di:waypoint x="320" y="693" />
+        <di:waypoint x="320" y="727" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ann1_di" bpmnElement="ann1"><dc:Bounds x="1510" y="41" width="300" height="68" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Assoc_ann1_di" bpmnElement="Assoc_ann1"><di:waypoint x="1630" y="225" /><di:waypoint x="1660" y="109" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ann2_di" bpmnElement="ann2"><dc:Bounds x="730" y="41" width="300" height="68" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Assoc_ann2_di" bpmnElement="Assoc_ann2"><di:waypoint x="1030" y="225" /><di:waypoint x="880" y="109" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
