@@ -60,7 +60,7 @@ def test_calculer_les_kpi_remplit_le_tableau(vue_kpi, application):
 
     assert application.erreurs == []
     lignes = vue.tableau.lignes()
-    assert len(lignes) == 27  # 7 précision x 2 méthodes + 13 sans méthode
+    assert len(lignes) == 34  # 7 précision x 3 méthodes + 13 sans méthode
     taux_hs = next(l for l in lignes if l["kpi_code"] == "TAUX_HS")
     assert taux_hs["valeur"] == pytest.approx(0.0)  # historique déterministe : pas d'heures sup
     assert taux_hs["statut"] == "vert"

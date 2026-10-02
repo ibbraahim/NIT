@@ -14,7 +14,12 @@ from app.gui.widgets.carte import Carte
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import afficher_erreur
 from app.gui.widgets.entete import BoutonIcone
-from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
+from app.gui.widgets.graphique import (
+    GraphiqueIntegre,
+    couleur_methode,
+    legende_en_haut,
+    remplissage_degrade,
+)
 from app.gui.widgets.kpi import CarteHero, carte_stat
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.traces import anneau, barres_groupees, jauge
@@ -500,7 +505,7 @@ class VueTableauBord(BlocBottomLine, Vue):
             0,
             2,
             "Réel contre prévisions",
-            "Heures par semaine : réalisé, régression (RL), réseau (RN)",
+            "Heures par semaine : réalisé, régression (RL), réseau (RN), boosting (GB)",
         )
         self._dessiner_reel_vs_previsions(graphique_heures, site_id)
         comptes = {"vert": 0, "orange": 0, "rouge": 0, "gris": 0}
@@ -559,7 +564,13 @@ class VueTableauBord(BlocBottomLine, Vue):
         for r in rapprochements:
             semaine = lundi_de(r["date_jour"])
             acc = semaines.setdefault(
-                semaine, {"reel": 0.0, "regression_lineaire": 0.0, "reseau_neurones": 0.0}
+                semaine,
+                {
+                    "reel": 0.0,
+                    "regression_lineaire": 0.0,
+                    "reseau_neurones": 0.0,
+                    "gradient_boosting": 0.0,
+                },
             )
             acc[r["methode"]] += r["heures_prevues"] or 0.0
             vues = zones_vues_par_jour.setdefault(r["date_jour"], set())
@@ -604,6 +615,15 @@ class VueTableauBord(BlocBottomLine, Vue):
                 color=COULEURS["vert"],
                 label="Prévu (RN)",
             )
+            axe.plot(
+                libelles,
+                [v["gradient_boosting"] for _, v in points],
+                marker="o",
+                markersize=3,
+                linewidth=1.8,
+                color=couleur_methode("gradient_boosting"),
+                label="Prévu (GB)",
+            )
             axe.set_ylabel("Heures / semaine")
             legende_en_haut(axe)
 
@@ -621,7 +641,12 @@ class VueTableauBord(BlocBottomLine, Vue):
             ligne, 0, 2, "Tendances sur 12 mois", "Adéquation de l'effectif et commandes à temps"
         )
         graphique_victoire = self._carte_graphique(
-            ligne, 1, 2, "Taux de victoire", "Régression linéaire contre réseau de neurones", 3.4
+            ligne,
+            1,
+            2,
+            "Taux de victoire",
+            "Régression linéaire, réseau de neurones et gradient boosting",
+            3.4,
         )
         self._dessiner_tendances_12_mois(graphique_tendances, site_id, zone_id)
         self._dessiner_taux_victoire(graphique_victoire, valeurs)
@@ -693,7 +718,11 @@ class VueTableauBord(BlocBottomLine, Vue):
         def _dessiner(axe):
             methodes = [METHODES_COURTES.get(v["methode"], v["methode"]) for v in lignes]
             valeurs_pct = [v["valeur"] for v in lignes]
-            couleurs = [COULEURS["primaire"], COULEURS["orange"]]
+            couleurs = [
+                COULEURS["primaire"],
+                COULEURS["orange"],
+                couleur_methode("gradient_boosting"),
+            ]
             for rang, valeur in enumerate(valeurs_pct):
                 barres_groupees(
                     axe,
@@ -701,7 +730,7 @@ class VueTableauBord(BlocBottomLine, Vue):
                     [
                         (
                             [valeur if i == rang else None for i in range(len(methodes))],
-                            couleurs[rang % 2],
+                            couleurs[rang % 3],
                             None,
                         )
                     ],

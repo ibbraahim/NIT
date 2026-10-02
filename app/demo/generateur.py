@@ -436,7 +436,7 @@ def _contexte_administrateur() -> Contexte:
 
 
 def entrainer_et_activer_demo(site_id: int, zones: dict[str, int]) -> None:
-    """Entraîne RL et RN pour chaque zone et active les deux (UC11 en a besoin pour les
+    """Entraîne RL, RN et GB pour chaque zone et active les trois (UC11 en a besoin pour les
     comparer côte à côte) ; la régression linéaire est retenue par défaut pour le plan de
     charge (référence de départ — la comparaison réel/prévu, au lot 5, montrera si le
     réseau de neurones la surpasse sur les pics, invitant à en changer via UC10 au lot 8)."""
@@ -460,8 +460,8 @@ def generer_retro_donnees_comparaison_demo(
 
     Les prévisions de volume rétroactives reprennent le volume réellement traité (biais nul
     sur le volume : l'écart mesuré vient du modèle heures/équipements lui-même, comme un vrai
-    test a posteriori). Les prévisions de ressources sont calculées avec les pipelines RL et
-    RN déjà entraînés, sur exactement la période de test qui a servi à leur évaluation
+    test a posteriori). Les prévisions de ressources sont calculées avec les pipelines RL,
+    RN et GB déjà entraînés, sur exactement la période de test qui a servi à leur évaluation
     (UC08/UC09) : les KPI de précision (lot 5) retrouvent ainsi les mêmes erreurs.
     """
     ctx_resp = _contexte_compte("resp", "responsable", site_id)

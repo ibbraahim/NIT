@@ -143,19 +143,32 @@ def calculer_ecart_equipements(rapprochements: list[dict]) -> float | None:
 
 
 def calculer_taux_victoire(
-    rapprochements: list[dict], rapprochements_autre: list[dict]
+    rapprochements: list[dict], *rapprochements_autres: list[dict]
 ) -> float | None:
-    """Part des jours où cette méthode a l'erreur absolue la plus faible (égalité non comptée)."""
-    autre_par_date = {r["date_jour"]: r for r in _comparables(rapprochements_autre)}
-    communs = [r for r in _comparables(rapprochements) if r["date_jour"] in autre_par_date]
+    """Part des jours où cette méthode a l'erreur absolue la plus faible, strictement, face à
+    chacune des autres méthodes (égalité non comptée). Seuls les jours comparables pour toutes
+    les méthodes comptent."""
+    autres_par_date = [
+        {r["date_jour"]: r for r in _comparables(autre)} for autre in rapprochements_autres
+    ]
+    communs = [
+        r
+        for r in _comparables(rapprochements)
+        if all(r["date_jour"] in par_date for par_date in autres_par_date)
+    ]
     if not communs:
         return None
     victoires = 0
     for r in communs:
         erreur = abs(r["heures_reelles"] - r["heures_prevues"])
-        autre = autre_par_date[r["date_jour"]]
-        erreur_autre = abs(autre["heures_reelles"] - autre["heures_prevues"])
-        if erreur < erreur_autre:
+        if all(
+            erreur
+            < abs(
+                par_date[r["date_jour"]]["heures_reelles"]
+                - par_date[r["date_jour"]]["heures_prevues"]
+            )
+            for par_date in autres_par_date
+        ):
             victoires += 1
     return victoires / len(communs) * 100
 
@@ -227,8 +240,8 @@ def calculer_taux_a_temps(sommes: dict) -> float | None:
     return _ratio(sommes["commandes_a_temps"], sommes["commandes_totales"])
 
 
-def _autre_methode(methode: str) -> str:
-    return next(m for m in METHODES if m != methode)
+def _autres_methodes(methode: str) -> list[str]:
+    return [m for m in METHODES if m != methode]
 
 
 # =====================================================================
@@ -350,7 +363,7 @@ CALCULATEURS_PAR_METHODE = {
     "COUV_IC": lambda c, m: calculer_couverture_ic(c.rapprochements[m]),
     "ECART_EQP": lambda c, m: calculer_ecart_equipements(c.rapprochements[m]),
     "TAUX_VICTOIRE": lambda c, m: calculer_taux_victoire(
-        c.rapprochements[m], c.rapprochements[_autre_methode(m)]
+        c.rapprochements[m], *(c.rapprochements[a] for a in _autres_methodes(m))
     ),
 }
 

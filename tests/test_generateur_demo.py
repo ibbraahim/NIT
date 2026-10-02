@@ -229,7 +229,11 @@ def test_previsions_ressources_generees_pour_toutes_les_zones(demo_complete):
         )
         lignes = cur.fetchall()
     assert {ligne["zone_id"] for ligne in lignes} == set(demo_complete["zones"].values())
-    assert {ligne["methode"] for ligne in lignes} == {"regression_lineaire", "reseau_neurones"}
+    assert {ligne["methode"] for ligne in lignes} == {
+        "regression_lineaire",
+        "reseau_neurones",
+        "gradient_boosting",
+    }
     assert all(ligne["n"] > 0 for ligne in lignes)
 
 

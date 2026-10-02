@@ -95,6 +95,19 @@ l'interface (carte, navigation, onglets en pilules, cartes d'indicateurs, tracé
 `app/gui/widgets/`. Les graphiques (anneau, jauge, barres arrondies, aires en dégradé) sont
 tracés avec matplotlib dans ces mêmes couleurs.
 
+## Méthodes de prévision
+
+Trois méthodes sont entraînées, évaluées et comparées sur les mêmes données (scikit-learn,
+`app/ml/entrainement.py`) : la **régression linéaire** (RL), le **réseau de neurones** (RN) et le
+**gradient boosting** (GB, arbres de décision boostés). Chacune produit des heures, un effectif et
+des équipements par zone et par jour, avec un intervalle de confiance. L'écran Modèles règle leurs
+hyperparamètres ; l'activation d'une version, et le choix de la méthode retenue pour le plan de
+charge, restent une décision de l'administrateur (jamais automatique). Le taux de victoire d'une
+méthode est la part des jours où son erreur est strictement la plus faible face aux deux autres.
+
+Les bases créées avant l'ajout du gradient boosting sont migrées automatiquement à l'ouverture
+(nouvelle valeur du type `methode_prevision`), sans réinitialisation.
+
 ## Bottom line : l'impact de Workly
 
 Le tableau de bord du **responsable** et de la **direction** se termine par un bloc « Bottom

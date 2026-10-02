@@ -43,11 +43,17 @@ COULEUR_ACCENT_MARQUE = colors.HexColor("#4C6CF0")
 #: dupliquées ici pour que ce module reste indépendant de Tkinter/app.gui).
 COULEURS_DEGRADE_MARQUE = ["#22D3EE", "#2FA8F5", "#4C6CF0", "#7B4AE2", "#B24AE2"]
 
-#: Palette des graphiques du rapport (réel, RL, RN — mêmes couleurs que l'écran Comparaison,
+#: Palette des graphiques du rapport (réel, RL, RN, GB — mêmes couleurs que l'écran Comparaison,
 #: reprises ici en dur pour que ce module reste indépendant de Tkinter/app.gui).
 COULEUR_REEL = "#1f4e79"
 COULEUR_RL = "#e07b00"
 COULEUR_RN = "#2e7d32"
+COULEUR_GB = "#8e24aa"
+COULEURS_METHODES = {
+    "regression_lineaire": COULEUR_RL,
+    "reseau_neurones": COULEUR_RN,
+    "gradient_boosting": COULEUR_GB,
+}
 
 
 @dataclass

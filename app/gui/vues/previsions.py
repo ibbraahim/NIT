@@ -11,9 +11,15 @@ from app.gui.vues.base import Vue
 from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import choisir_fichier_a_enregistrer, informer
-from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
+from app.gui.widgets.graphique import (
+    GraphiqueIntegre,
+    couleur_methode,
+    legende_en_haut,
+    remplissage_degrade,
+)
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
+from app.libelles import METHODES, METHODES_COURTES
 from app.services import admin, planification
 from app.services.droits import a_le_droit
 from app.services.planification import HORIZONS_VALIDES
@@ -22,16 +28,17 @@ from app.utils.format_fr import formater_date, formater_nombre
 
 OPTIONS_HORIZON = [(h, f"{h} jours") for h in HORIZONS_VALIDES]
 
+#: Suffixes des colonnes par méthode (``heures_rl``, ``heures_rn``, ``heures_gb``…), dans l'ordre
+#: des méthodes de prévision.
+SUFFIXES = [METHODES_COURTES[m].lower() for m in METHODES]
+
 COLONNES_TABLEAU = [
     Colonne("date_jour", "Date", 95, "center"),
     Colonne("zone", "Zone", 105),
     Colonne("volume_prevu", "Volume demandé", 125, "e"),
-    Colonne("heures_rl", "Heures RL", 88, "e"),
-    Colonne("heures_rn", "Heures RN", 88, "e"),
-    Colonne("effectif_rl", "Effectif RL", 92, "e"),
-    Colonne("effectif_rn", "Effectif RN", 92, "e"),
-    Colonne("equipements_rl", "Équip. RL", 88, "e"),
-    Colonne("equipements_rn", "Équip. RN", 88, "e"),
+    *(Colonne(f"heures_{s}", f"Heures {s.upper()}", 82, "e") for s in SUFFIXES),
+    *(Colonne(f"effectif_{s}", f"Effectif {s.upper()}", 86, "e") for s in SUFFIXES),
+    *(Colonne(f"equipements_{s}", f"Équip. {s.upper()}", 82, "e") for s in SUFFIXES),
     Colonne("ic_actif", "Intervalle de confiance", 150, "center"),
     Colonne("modele_actif_coche", "Modèle actif", 100, "center"),
 ]
@@ -48,7 +55,7 @@ def _intervalle_actif(ligne: dict) -> str:
 
 
 class VuePrevisions(Vue):
-    """Filtres Site/Zone/Horizon, génération, tableau et graphique RL/RN."""
+    """Filtres Site/Zone/Horizon, génération, tableau et graphique RL/RN/GB."""
 
     titre = "Prévisions"
     sous_titre = "Traduction de la demande client en heures, effectif et équipements"
@@ -158,6 +165,14 @@ class VuePrevisions(Vue):
                 color=COULEURS["orange"],
                 label="Réseau de neurones (RN)",
             )
+            axe.plot(
+                dates,
+                [l["heures_gb"] for l in lignes],
+                marker="o",
+                markersize=3,
+                color=couleur_methode("gradient_boosting"),
+                label="Gradient boosting (GB)",
+            )
             suffixe = (lignes[0].get("modele_actif") or "rl").lower()
             bas = [l.get(f"ic_bas_{suffixe}") for l in lignes]
             haut = [l.get(f"ic_haut_{suffixe}") for l in lignes]
@@ -200,8 +215,8 @@ class VuePrevisions(Vue):
             traiter,
             succes,
             titre="Génération des prévisions",
-            message="Calcul des prévisions avec la régression linéaire et le réseau de "
-            "neurones…",
+            message="Calcul des prévisions avec la régression linéaire, le réseau de "
+            "neurones et le gradient boosting…",
             annulable=True,
         )
 
@@ -220,12 +235,9 @@ class VuePrevisions(Vue):
             "Date",
             "Zone",
             "Volume demandé",
-            "Heures RL",
-            "Heures RN",
-            "Effectif RL",
-            "Effectif RN",
-            "Équipements RL",
-            "Équipements RN",
+            *(f"Heures {s.upper()}" for s in SUFFIXES),
+            *(f"Effectif {s.upper()}" for s in SUFFIXES),
+            *(f"Équipements {s.upper()}" for s in SUFFIXES),
             "Intervalle de confiance",
             "Modèle actif",
         ]
@@ -234,12 +246,9 @@ class VuePrevisions(Vue):
                 formater_date(l["date_jour"]),
                 l["zone"],
                 l["volume_prevu"],
-                l["heures_rl"],
-                l["heures_rn"],
-                l["effectif_rl"],
-                l["effectif_rn"],
-                l["equipements_rl"],
-                l["equipements_rn"],
+                *(l[f"heures_{s}"] for s in SUFFIXES),
+                *(l[f"effectif_{s}"] for s in SUFFIXES),
+                *(l[f"equipements_{s}"] for s in SUFFIXES),
                 l["ic_actif"],
                 l["modele_actif_coche"],
             ]

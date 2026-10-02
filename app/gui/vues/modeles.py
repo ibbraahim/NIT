@@ -11,7 +11,7 @@ from app.gui.widgets.bouton import Bouton
 from app.gui.widgets.carte import ECART_CARTES, ajouter_carte
 from app.gui.widgets.champs import ChampCase, ChampListe, ChampNombre, ChampTexte, appliquer_erreurs
 from app.gui.widgets.dialogues import DialogueBase, afficher_erreur, confirmer, informer
-from app.gui.widgets.graphique import COULEURS_SERIES, GraphiqueIntegre
+from app.gui.widgets.graphique import COULEURS_SERIES, GraphiqueIntegre, couleur_methode
 from app.gui.widgets.onglets import Onglets
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.taches_fond import executer_en_fond
@@ -67,7 +67,7 @@ class OngletParametres(ttk.Frame):
         carte = ajouter_carte(
             self,
             "Variables d'entrée actives",
-            "Les variables prises en compte par les deux modèles",
+            "Les variables prises en compte par les trois modèles",
         )
         cadre = carte.zone
         self.variables: dict[str, ChampCase] = {}
@@ -92,6 +92,15 @@ class OngletParametres(ttk.Frame):
         self.widgets["activation"].grid(row=0, column=1, sticky="w", padx=(0, 24))
         self.widgets["max_iter"] = ChampNombre(cadre, "Itérations maximum", decimales=0)
         self.widgets["max_iter"].grid(row=0, column=2, sticky="w")
+
+        carte = ajouter_carte(self, "Gradient boosting", "Arbres de décision boostés")
+        cadre = carte.zone
+        self.widgets["gb_n_estimators"] = ChampNombre(cadre, "Nombre d'arbres", decimales=0)
+        self.widgets["gb_n_estimators"].grid(row=0, column=0, sticky="w", padx=(0, 24))
+        self.widgets["gb_learning_rate"] = ChampNombre(cadre, "Taux d'apprentissage", decimales=3)
+        self.widgets["gb_learning_rate"].grid(row=0, column=1, sticky="w", padx=(0, 24))
+        self.widgets["gb_max_depth"] = ChampNombre(cadre, "Profondeur des arbres", decimales=0)
+        self.widgets["gb_max_depth"].grid(row=0, column=2, sticky="w")
 
         carte = ajouter_carte(
             self, "Découpage et fiabilité", "Jeu de test, intervalle de confiance et dérive"
@@ -145,6 +154,10 @@ class OngletParametres(ttk.Frame):
         )
         self.widgets["activation"].definir(hyper["activation"])
         self.widgets["max_iter"].definir(hyper["max_iter"])
+        hyper_gb = config["hyperparametres_gb"]
+        self.widgets["gb_n_estimators"].definir(hyper_gb["n_estimators"])
+        self.widgets["gb_learning_rate"].definir(hyper_gb["learning_rate"])
+        self.widgets["gb_max_depth"].definir(hyper_gb["max_depth"])
         self.widgets["part_test"].definir(config["part_test"] * 100)
         self.widgets["niveau_confiance"].definir(config["niveau_confiance"] * 100)
         self.widgets["seuil_derive_mape"].definir(config["seuil_derive_mape"])
@@ -163,6 +176,11 @@ class OngletParametres(ttk.Frame):
                 "hidden_layer_sizes": [c.strip() for c in couches_texte.split(",") if c.strip()],
                 "activation": self.widgets["activation"].valeur(),
                 "max_iter": self.widgets["max_iter"].valeur(),
+            },
+            "hyperparametres_gb": {
+                "n_estimators": self.widgets["gb_n_estimators"].valeur(),
+                "learning_rate": self.widgets["gb_learning_rate"].valeur(),
+                "max_depth": self.widgets["gb_max_depth"].valeur(),
             },
             "part_test": _pourcentage_vers_fraction(self.widgets["part_test"].valeur()),
             "niveau_confiance": _pourcentage_vers_fraction(
@@ -368,11 +386,11 @@ class OngletEntrainement(ttk.Frame):
             return
 
         def _dessiner(axe):
-            couleur = (
-                COULEURS_SERIES[0]
-                if ligne["methode"] == "regression_lineaire"
-                else COULEURS_SERIES[1]
-            )
+            couleur = {
+                "regression_lineaire": COULEURS_SERIES[0],
+                "reseau_neurones": COULEURS_SERIES[1],
+                "gradient_boosting": couleur_methode("gradient_boosting"),
+            }[ligne["methode"]]
             axe.scatter(predictions, residus, color=couleur, alpha=0.75, edgecolors="none")
             axe.axhline(0, color=COULEURS["texte_secondaire"], linewidth=1, linestyle="--")
             axe.set_xlabel("Valeur prédite")
@@ -416,7 +434,8 @@ class OngletEntrainement(ttk.Frame):
             traiter,
             succes,
             titre="Entraînement des modèles",
-            message="Entraînement de la régression linéaire et du réseau de neurones…",
+            message="Entraînement de la régression linéaire, du réseau de neurones et du "
+            "gradient boosting…",
             annulable=True,
         )
 
