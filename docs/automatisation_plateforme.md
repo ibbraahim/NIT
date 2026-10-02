@@ -5,6 +5,37 @@ Ce document donne, pas à pas, ce qu'il faut créer dans une plateforme d'automa
 planificateur interne. Les noms de blocs sont génériques : chaque plateforme les appelle un peu
 différemment (voir le tableau de correspondance en fin de document).
 
+## 0. Architecture en service : le pipeline unique
+
+C'est cette organisation qui tourne en production ; les scénarios séparés des sections 5 et
+suivantes restent valables comme variante plus simple.
+
+```
+Cron pipeline (00:30 UTC)  ─┐
+Manual Trigger (bouton ▷)  ─┴→ Workly sante (GET /sante, sans jeton)
+   → P1 Sauvegarde            POST /taches/sauvegarde_base      (continue même en échec)
+   → P2 Import historique     POST /taches/import_historique
+   → P3 Import previsions     POST /taches/import_previsions_volume
+   → P4 Comparaison           POST /taches/comparaison_quotidienne
+   → P5 KPI du jour           POST /taches/kpi_quotidiens
+   → P6 Alertes capacite      POST /taches/alertes_capacite
+   → P7 Previsions            POST /taches/previsions_quotidiennes
+   → P8 Rapport du jour       POST /taches/rapport_quotidien
+   → P9 Taches du jour        POST /taches-du-jour   (dimanche, lundi, 1er du mois, 1er janvier)
+
+Cron surveillance (toutes les 10 min) → GET /sante
+```
+
+- Chaque étape en échec appelle `POST /alerte?etape=<nom>` (e-mail envoyé par Workly) et arrête
+  le pipeline ; seule la sauvegarde laisse le pipeline continuer.
+- Tous les appels sauf `/sante` portent `Authorization: Bearer <jeton>` : sans lui, Workly
+  répond 401. Un chemin d'URL doublé (`/taches//taches/...`) répond 404 : relire le champ URL.
+- Un Cron de la plateforme est actif dès l'enregistrement ; il s'écrit en cinq champs séparés
+  par des espaces (`30 0 * * *`), sinon la plateforme refuse de démarrer le workflow.
+- Les horaires sont en UTC (Maroc : +1 h). Workly n'exécute qu'une tâche à la fois (409 sinon).
+- Le PC (ou le serveur) doit rester allumé, sans veille, avec Workly et ngrok lancés
+  (`scripts/demarrer_workly.ps1`, démarrage automatique : `scripts/installer_demarrage_auto.ps1`).
+
 ## 1. Architecture
 
 ```
