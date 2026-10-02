@@ -67,6 +67,8 @@ Tâches).
 | `GET /sante` | vivacité (sans jeton) | 200 `{"ok": true}` |
 | `GET /taches` | liste des 12 tâches et du cycle nocturne | 200, 401 |
 | `POST /taches/<nom>` | exécute une tâche | 200 succès, 500 échec, 404 inconnue, 401 jeton, 409 déjà en cours |
+| `GET /aujourdhui` | date UTC et drapeaux `est_dimanche`, `est_lundi`, `est_premier_du_mois`, `est_premier_janvier` (aiguillage par date) | 200, 401 |
+| `POST /alerte?etape=<nom>` | envoie l'e-mail « échec de l'étape <nom> » (le nom est nettoyé) | 200, 500 si l'e-mail n'est pas parti, 401 |
 | `POST /cycle-nocturne` | enchaîne import → comparaison → KPI → alertes → prévisions → rapport, s'arrête à la première erreur | 200 ou 500 avec `etape_en_echec` |
 
 Toutes les requêtes `POST` portent l'en-tête `Authorization: Bearer {{TOKEN_WORKLY}}`. Corps de

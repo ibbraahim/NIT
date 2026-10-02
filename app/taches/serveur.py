@@ -11,7 +11,10 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
     GET  /sante               {"ok": true}                          (sans jeton)
     GET  /taches              liste des tâches
     POST /taches/<nom>        exécute une tâche
+    GET  /aujourdhui          date du jour (UTC) et drapeaux : dimanche, lundi, 1er du mois, 1er
+                              janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
+    POST /alerte?etape=<nom>  envoie un e-mail « échec de l'étape <nom> » (alerte d'un workflow)
     POST /cycle-nocturne      import → comparaison → KPI → alertes → prévisions → rapport,
                               arrêt à la première erreur
 """
@@ -21,9 +24,12 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 import threading
 import time
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 from app.journal import journal
 
@@ -42,6 +48,28 @@ CYCLE_NOCTURNE = (
 )
 
 _verrou = threading.Lock()
+
+JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+_ETAPE_VALIDE = re.compile(r"[^A-Za-z0-9_ .-]")
+
+
+def aujourdhui(maintenant: datetime | None = None) -> dict:
+    """Date du jour en UTC et drapeaux d'aiguillage (les Cron de la plateforme sont en UTC)."""
+    maintenant = maintenant or datetime.now(UTC)
+    return {
+        "date": maintenant.date().isoformat(),
+        "jour_semaine": JOURS[maintenant.weekday()],
+        "est_dimanche": maintenant.weekday() == 6,
+        "est_lundi": maintenant.weekday() == 0,
+        "est_premier_du_mois": maintenant.day == 1,
+        "est_premier_janvier": maintenant.day == 1 and maintenant.month == 1,
+    }
+
+
+def nettoyer_etape(valeur: str) -> str:
+    """Nom d'étape sûr pour un objet d'e-mail : caractères simples, 60 au plus."""
+    propre = _ETAPE_VALIDE.sub("", valeur).strip()[:60]
+    return propre or "inconnue"
 
 
 def executer_et_mesurer(nom: str) -> dict:
@@ -115,6 +143,9 @@ def fabriquer_gestionnaire(jeton: str):
             if not self._autorise():
                 self._repondre(401, {"erreur": "Jeton manquant ou invalide."})
                 return
+            if self.path == "/aujourdhui":
+                self._repondre(200, aujourdhui())
+                return
             if self.path == "/taches":
                 from app.taches.planificateur import TACHES
 
@@ -136,6 +167,25 @@ def fabriquer_gestionnaire(jeton: str):
                 self._repondre(
                     200 if envoye else 500,
                     {"statut": "succes" if envoye else "echec", "envoye": envoye},
+                )
+                return
+            if urlsplit(self.path).path == "/alerte":
+                from app.taches.notifications import envoyer
+
+                etape = nettoyer_etape(
+                    parse_qs(urlsplit(self.path).query).get("etape", ["inconnue"])[0]
+                )
+                quand = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                envoye = envoyer(
+                    f"Workly : échec de l'étape {etape} (pipeline)",
+                    f"L'étape « {etape} » du pipeline automatique a échoué le {quand}.\n\n"
+                    "Pour comprendre la cause : Workly > Administration > Tâches > Voir le "
+                    "journal, ou le fichier journaux/application.log.\n"
+                    "Vérifiez aussi que PostgreSQL est démarré.",
+                )
+                self._repondre(
+                    200 if envoye else 500,
+                    {"statut": "succes" if envoye else "echec", "envoye": envoye, "etape": etape},
                 )
                 return
             if self.path == "/cycle-nocturne":

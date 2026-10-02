@@ -6,6 +6,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from datetime import UTC
 from http.server import ThreadingHTTPServer
 
 import pytest
@@ -133,3 +134,44 @@ def test_route_test_mail(adresse, monkeypatch):
 
     monkeypatch.setattr(notifications, "envoyer", lambda sujet, corps: False)
     assert appeler(adresse, "/test-mail", "POST")[0] == 500
+
+
+def test_aujourdhui_drapeaux_de_date():
+    from datetime import datetime
+
+    dimanche = serveur.aujourdhui(datetime(2026, 10, 4, 0, 30, tzinfo=UTC))
+    assert dimanche["jour_semaine"] == "dimanche" and dimanche["est_dimanche"]
+    assert not dimanche["est_lundi"] and not dimanche["est_premier_du_mois"]
+    premier_janvier = serveur.aujourdhui(datetime(2027, 1, 1, 0, 30, tzinfo=UTC))
+    assert premier_janvier["est_premier_du_mois"] and premier_janvier["est_premier_janvier"]
+    assert serveur.aujourdhui(datetime(2026, 10, 5, tzinfo=UTC))["est_lundi"]
+    assert serveur.aujourdhui(datetime(2026, 11, 1, tzinfo=UTC))["est_premier_janvier"] is False
+
+
+def test_aujourdhui_exige_le_jeton_et_repond(adresse):
+    assert appeler(adresse, "/aujourdhui", jeton=None)[0] == 401
+    code, corps = appeler(adresse, "/aujourdhui")
+    assert code == 200 and "jour_semaine" in corps
+
+
+def test_alerte_envoie_un_mail_au_nom_nettoye(adresse, monkeypatch):
+    envois = []
+    import app.taches.notifications as notifications
+
+    monkeypatch.setattr(
+        notifications, "envoyer", lambda sujet, corps: envois.append((sujet, corps)) or True
+    )
+    code, corps = appeler(adresse, "/alerte?etape=KPI%20du%20jour%0D%0ABcc:x@y.z", "POST")
+    assert code == 200 and corps["envoye"] is True
+    sujet, _ = envois[0]
+    assert "\n" not in sujet and "\r" not in sujet
+    assert "KPI du jour" in sujet
+    assert appeler(adresse, "/alerte?etape=x", "POST", jeton=None)[0] == 401
+
+
+def test_alerte_sans_messagerie_configuree_repond_echec(adresse, monkeypatch):
+    import app.taches.notifications as notifications
+
+    monkeypatch.setattr(notifications, "envoyer", lambda sujet, corps: False)
+    code, corps = appeler(adresse, "/alerte?etape=import", "POST")
+    assert code == 500 and corps["statut"] == "echec"
