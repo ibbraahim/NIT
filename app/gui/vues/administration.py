@@ -53,6 +53,7 @@ LIBELLES_TACHES = {
     "rapport_quotidien": "Générer le rapport quotidien (UC23)",
     "hebdomadaire": "Réentraîner les modèles et générer le rapport hebdomadaire (UC08, "
     "UC17, UC23)",
+    "capacites_semaine": "Reconduire les capacités du personnel vers la semaine suivante (UC03)",
     "mensuel": "Calculer les KPI et générer le rapport mensuel (UC17, UC23)",
     "annuel": "Calculer les KPI et générer le rapport annuel (UC17, UC23)",
 }

@@ -1,7 +1,7 @@
 """Tâches automatiques : APScheduler (``BackgroundScheduler``) et journalisation dans
 ``journal_taches``.
 
-Dix tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
+Onze tâches, exécutées au nom du contexte système (``CONTEXTE_SYSTEME``, acteur « Planificateur
 de tâches »), pour chaque site :
 
 - ``import_historique`` (01:00) — UC04 (import) + UC06, sur les fichiers déposés dans
@@ -19,6 +19,8 @@ de tâches »), pour chaque site :
 - ``hebdomadaire`` (lundi, heure configurable via UC07 — jour_reentrainement/
   heure_reentrainement, par défaut lundi 03:00) — UC08 (ne change jamais le modèle actif,
   docs/plan.md), puis UC17 (semaine) et UC23 (semaine).
+- ``capacites_semaine`` (dimanche, 04:30) — reconduit les capacités du personnel de la semaine
+  en cours vers la semaine suivante, si celle-ci n'est pas déjà renseignée.
 - ``mensuel`` (1er du mois, 04:00) — UC17 (mois), UC23 (mois).
 - ``annuel`` (1er janvier, 05:00) — UC17 (année), UC23 (année).
 
@@ -30,6 +32,7 @@ la tâche qui le produit.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date, timedelta
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -48,7 +51,16 @@ from app.config import (
 from app.contexte import CONTEXTE_SYSTEME
 from app.erreurs import ErreurApplication
 from app.journal import journal
-from app.services import alertes, comparaison, donnees, kpi, modeles, planification, rapports
+from app.services import (
+    admin,
+    alertes,
+    comparaison,
+    donnees,
+    kpi,
+    modeles,
+    planification,
+    rapports,
+)
 from app.services.modeles import DEFAUT_PARAMETRES
 from app.taches.notifications import notifier_echec
 from app.utils.fichiers_excel import EXTENSIONS_PRISES_EN_CHARGE
@@ -75,6 +87,7 @@ FREQUENCES_FIXES = {
     "alertes_capacite": "Chaque jour à 01:50",
     "previsions_quotidiennes": "Chaque jour à 02:00",
     "rapport_quotidien": "Chaque jour à 06:00",
+    "capacites_semaine": "Chaque dimanche à 04:30",
     "mensuel": "Le 1er de chaque mois à 04:00",
     "annuel": "Le 1er janvier à 05:00",
 }
@@ -134,7 +147,7 @@ def _generer_rapports(periodicite: str, format_rapport: str = "pdf_excel") -> in
 
 
 # =====================================================================
-# Les dix tâches automatiques
+# Les onze tâches automatiques
 # =====================================================================
 def _importer_dossier(dossier: Path, importer: Callable, enregistrer: Callable) -> str:
     """Importe chaque fichier d'un dossier de dépôt (UC06 appliqué par ``importer``), enregistre
@@ -240,6 +253,20 @@ def tache_hebdomadaire() -> str:
     )
 
 
+def tache_capacites_semaine() -> str:
+    """Reconduit les capacités du personnel vers la semaine suivante, pour chaque site."""
+    sites = _sites()
+    lundi_suivant = date.today() + timedelta(days=(7 - date.today().weekday()))
+    reconduits = [
+        admin.reconduire_capacites(CONTEXTE_SYSTEME, site["id"], lundi_suivant) for site in sites
+    ]
+    nb_sites = sum(1 for n in reconduits if n)
+    return (
+        f"{sum(reconduits)} capacité(s) reconduite(s) vers la semaine du {lundi_suivant:%d/%m/%Y} "
+        f"sur {nb_sites} site(s) ({len(sites) - nb_sites} déjà renseigné(s) ou sans source)."
+    )
+
+
 def tache_mensuel() -> str:
     """UC17 (mois) et UC23 (mois), pour chaque site."""
     nb_sites, nb_kpi = _calculer_kpi("mois")
@@ -263,6 +290,7 @@ TACHES: dict[str, Callable[[], str]] = {
     "previsions_quotidiennes": tache_previsions_quotidiennes,
     "rapport_quotidien": tache_rapport_quotidien,
     "hebdomadaire": tache_hebdomadaire,
+    "capacites_semaine": tache_capacites_semaine,
     "mensuel": tache_mensuel,
     "annuel": tache_annuel,
 }
@@ -361,6 +389,12 @@ class Planificateur:
             lambda: executer_tache("hebdomadaire"),
             CronTrigger(day_of_week=jour, hour=heure, minute=minute),
             id="hebdomadaire",
+            replace_existing=True,
+        )
+        self._scheduler.add_job(
+            lambda: executer_tache("capacites_semaine"),
+            CronTrigger(day_of_week="sun", hour=4, minute=30),
+            id="capacites_semaine",
             replace_existing=True,
         )
         self._scheduler.add_job(

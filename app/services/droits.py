@@ -46,6 +46,9 @@ DROITS: dict[str, frozenset[str]] = {
     "lecture_alertes": frozenset({P, R, A, S}),
     "lecture_modeles": frozenset({A, R, S}),
     "taches": frozenset({A, S}),
+    # Reconduction automatique des capacités de la semaine suivante : droit étroit, accordé au
+    # planificateur de tâches sans lui ouvrir le reste de UC03 (gestion des référentiels).
+    "reconduction_capacites": frozenset({A, S}),
 }
 
 LIBELLES_DROITS = {
@@ -73,6 +76,7 @@ LIBELLES_DROITS = {
     "UC23": "générer un rapport de performance",
     "UC24": "exporter un rapport",
     "taches": "piloter les tâches automatiques",
+    "reconduction_capacites": "reconduire les capacités du personnel",
 }
 
 

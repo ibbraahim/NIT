@@ -132,3 +132,26 @@ def test_couts_horaires(ctx_admin):
     with pytest.raises(DonneesInvalides) as erreur:
         admin.enregistrer_cout(ctx_admin, "prime", -1, "EURO", "x")
     assert set(erreur.value.erreurs) == {"categorie", "taux", "devise", "date_debut"}
+
+
+def test_reconduire_capacites_n_ecrase_jamais_une_semaine_renseignee(ctx_admin):
+    from app.contexte import CONTEXTE_SYSTEME
+
+    site_id, zone_id = _site_zone(ctx_admin)
+    lundi = date(2026, 3, 9)
+    admin.enregistrer_capacites(
+        ctx_admin, site_id, {(zone_id, lundi + timedelta(days=i)): (10, 1) for i in range(7)}
+    )
+    suivante = lundi + timedelta(days=7)
+    assert admin.reconduire_capacites(CONTEXTE_SYSTEME, site_id, suivante + timedelta(days=2)) == 7
+    copie = admin.lire_capacites(ctx_admin, site_id, suivante)
+    assert copie[(zone_id, suivante)]["effectif_planifie"] == 10
+    # Saisie manuelle de la semaine suivante : un second passage ne la modifie pas.
+    admin.enregistrer_capacites(ctx_admin, site_id, {(zone_id, suivante): (4, 0)})
+    assert admin.reconduire_capacites(CONTEXTE_SYSTEME, site_id, suivante) == 0
+    assert (
+        admin.lire_capacites(ctx_admin, site_id, suivante)[(zone_id, suivante)]["effectif_planifie"]
+        == 4
+    )
+    # Semaine source vide : rien à copier, sans erreur.
+    assert admin.reconduire_capacites(CONTEXTE_SYSTEME, site_id, date(2030, 1, 7)) == 0

@@ -65,7 +65,7 @@ Tâches).
 | Appel | Effet | Réponses |
 |---|---|---|
 | `GET /sante` | vivacité (sans jeton) | 200 `{"ok": true}` |
-| `GET /taches` | liste des 10 tâches et du cycle nocturne | 200, 401 |
+| `GET /taches` | liste des 11 tâches et du cycle nocturne | 200, 401 |
 | `POST /taches/<nom>` | exécute une tâche | 200 succès, 500 échec, 404 inconnue, 401 jeton, 409 déjà en cours |
 | `POST /cycle-nocturne` | enchaîne import → comparaison → KPI → alertes → prévisions → rapport, s'arrête à la première erreur | 200 ou 500 avec `etape_en_echec` |
 
@@ -143,6 +143,14 @@ Cron `0 3 * * 1` (lundi 03:00) ; appel `POST /taches/hebdomadaire` (réentraîne
 KPI et rapport de la semaine). Le réentraînement ne change jamais le modèle actif : l'activation
 reste une décision humaine (écran Modèles). Si le jour ou l'heure sont modifiés dans
 Modèles → Paramètres, modifier aussi ce cron.
+
+### Scénario 3 bis — « Workly · Capacités de la semaine »
+
+Cron `30 4 * * 0` (dimanche, 04:30 UTC) ; appel `POST /taches/capacites_semaine`, délai 5 min.
+Reconduit les effectifs et absences prévus de la semaine en cours vers la semaine suivante, pour
+chaque site, **sans jamais écraser** une semaine déjà renseignée. Cette tâche utilise un droit
+dédié (`reconduction_capacites`) : le planificateur de tâches n'a pas accès au reste de la
+gestion des référentiels.
 
 ### Scénario 4 — « Workly · Mensuel »
 

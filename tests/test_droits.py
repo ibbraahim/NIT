@@ -76,3 +76,15 @@ def test_services_uc03_refuses_hors_administrateur(role):
 def test_lecture_referentiels_limitee_aux_sites_rattaches():
     with pytest.raises(AccesRefuse):
         admin.lister_zones(ctx("planificateur", sites=[1]), site_id=2)
+
+
+@pytest.mark.parametrize("role", ["planificateur", "responsable", "direction"])
+def test_reconduction_des_capacites_refusee_hors_administrateur_et_systeme(role):
+    with pytest.raises(AccesRefuse):
+        admin.reconduire_capacites(ctx(role), 1, date.today())
+
+
+def test_le_systeme_ne_gere_pas_les_referentiels():
+    """Le droit de reconduction est étroit : le reste de UC03 reste réservé à l'administrateur."""
+    with pytest.raises(AccesRefuse):
+        admin.enregistrer_site(CONTEXTE_SYSTEME, "Site X")

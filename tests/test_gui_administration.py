@@ -97,10 +97,10 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     assert not application.planificateur.est_actif
     assert "arrêté" in taches.etat_planificateur.cget("text")
 
-    # Le tableau de synthèse liste les dix tâches automatiques, chacune sa fréquence, même
+    # Le tableau de synthèse liste les onze tâches automatiques, chacune sa fréquence, même
     # avant toute exécution.
     lignes = taches.tableau.lignes()
-    assert len(lignes) == 10
+    assert len(lignes) == 11
     assert all(l["dernier_statut_libelle"] == "Jamais exécutée" for l in lignes)
     assert all(l["frequence"] for l in lignes)
 
@@ -119,7 +119,7 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
 
     assert application.erreurs == []
     lignes = taches.tableau.lignes()
-    assert len(lignes) == 10
+    assert len(lignes) == 11
     kpi_ligne = next(l for l in lignes if l["id"] == "kpi_quotidiens")
     assert kpi_ligne["dernier_statut_libelle"] == "Succès"
     assert kpi_ligne["derniere_duree"] != "—"

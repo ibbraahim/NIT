@@ -346,6 +346,37 @@ def copier_semaine_precedente(ctx: Contexte, site_id: int, jour: date) -> int:
     return len(sources)
 
 
+def reconduire_capacites(ctx: Contexte, site_id: int, jour: date) -> int:
+    """Tâche automatique : reconduit les capacités de la semaine qui précède celle contenant
+    ``jour`` vers cette semaine, mais seulement si celle-ci n'a encore aucune capacité (une
+    saisie existante n'est jamais écrasée). Renvoie le nombre de lignes copiées (0 si la
+    semaine cible est déjà renseignée ou si la semaine source est vide)."""
+    verifier_droit(ctx, "reconduction_capacites")
+    verifier_site(ctx, site_id)
+    lundi = lundi_de(jour)
+    precedent = lundi - timedelta(days=7)
+    with transaction() as cur:
+        depot = DepotReferentiels(cur)
+        if depot.capacites(site_id, lundi, lundi + timedelta(days=6)):
+            return 0
+        sources = depot.capacites(site_id, precedent, precedent + timedelta(days=6))
+        for ligne in sources:
+            depot.enregistrer_capacite(
+                site_id,
+                ligne["zone_id"],
+                ligne["date_jour"] + timedelta(days=7),
+                ligne["effectif_planifie"],
+                ligne["absences_prevues"],
+            )
+    _log.info(
+        "%d capacités reconduites vers la semaine du %s par %s.",
+        len(sources),
+        lundi,
+        ctx.identifiant,
+    )
+    return len(sources)
+
+
 def jours_de_la_semaine(jour: date) -> list[date]:
     """Les 7 jours (lundi → dimanche) de la semaine contenant ``jour``."""
     return jours_semaine(lundi_de(jour))

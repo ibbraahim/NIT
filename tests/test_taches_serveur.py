@@ -51,7 +51,7 @@ def test_jeton_obligatoire_et_verifie(adresse):
 def test_liste_des_taches(adresse):
     code, corps = appeler(adresse, "/taches")
     assert code == 200
-    assert len(corps["taches"]) == 10
+    assert len(corps["taches"]) == 11
     assert corps["cycle_nocturne"][0] == "import_historique"
 
 
