@@ -2,10 +2,12 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\demarrer_workly.ps1
 #
+# Option -SansNgrok : ne lance que le serveur (ngrok déjà ouvert dans un autre terminal).
 # Le jeton est lu dans un fichier (jamais écrit dans ce script). Les réglages d'alerte e-mail
 # viennent de scripts\configurer_alertes.ps1. Arrêt : Ctrl+C dans cette fenêtre, puis fermer la
 # fenêtre ngrok.
 param(
+    [switch]$SansNgrok,
     [string]$FichierJeton = "$HOME\Desktop\jeton-workly.txt",
     [string]$DomaineNgrok = "condone-dragonfly-coveting.ngrok-free.dev",
     [int]$Port = 8765
@@ -34,8 +36,17 @@ if (-not $env:WORKLY_SMTP_MOT_DE_PASSE) {
 $activation = Join-Path $racine ".venv\Scripts\Activate.ps1"
 if (Test-Path $activation) { . $activation }
 
-# Tunnel ngrok dans sa propre fenêtre
-Start-Process powershell -ArgumentList "-NoExit", "-Command",
-    "ngrok http $Port --url https://$DomaineNgrok"
+# Tunnel ngrok dans sa propre fenêtre (option -SansNgrok si vous le lancez vous-même).
+# Un seul ngrok peut servir ce domaine : s'il en tourne déjà un, on n'en démarre pas un second.
+if ($SansNgrok) {
+    Write-Host "ngrok non lance (option -SansNgrok)." -ForegroundColor Yellow
+} elseif (Get-Process ngrok -ErrorAction SilentlyContinue) {
+    Write-Host "ngrok tourne deja : pas de second tunnel." -ForegroundColor Yellow
+} elseif (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+    Write-Host "ngrok est introuvable dans le PATH : lancez-le a la main (voir la documentation)." -ForegroundColor Red
+} else {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command",
+        "ngrok http $Port --url https://$DomaineNgrok"
+}
 
 python -m app.taches serveur --port $Port
