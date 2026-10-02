@@ -59,14 +59,14 @@ class DepotBottomLine(Depot):
     def alertes_periode(
         self, site_id: int, zone_id: int | None, debut: date, fin: date
     ) -> list[dict]:
-        """Alertes créées sur la période, avec leurs dates de traitement."""
+        """Alertes portant sur des jours de la période, avec leurs dates de traitement."""
         return self._tous(
             """SELECT type::text AS type, niveau::text AS niveau, statut::text AS statut,
                       zone_id, date_concernee, date_creation, date_prise_en_charge,
                       date_resolution
                FROM alertes
                WHERE site_id = %s AND (%s::int IS NULL OR zone_id = %s)
-                 AND date_creation::date BETWEEN %s AND %s""",
+                 AND date_concernee BETWEEN %s AND %s""",
             (site_id, zone_id, zone_id, debut, fin),
         )
 

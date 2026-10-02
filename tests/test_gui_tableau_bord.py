@@ -164,6 +164,8 @@ def _resultat_bottom_line_factice() -> dict:
     taux = {"interne": 10.0, "heures_sup": 15.0}
     jours = [
         {
+            "date_jour": date(2026, 9, 1) + timedelta(days=rang),
+            "zone": "Réception" if rang % 2 else "Expédition",
             "besoin": 100.0,
             "plan_workly": 105.0,
             "plan_reconduit": 80.0,
@@ -171,7 +173,8 @@ def _resultat_bottom_line_factice() -> dict:
             "commandes_totales": 200,
             "commandes_a_temps": 190,
         }
-    ] * 5
+        for rang in range(5)
+    ]
     creation = datetime(2026, 9, 1, 8, 0, tzinfo=UTC)
     alerte = {
         "type": "penurie_equipement",
@@ -187,17 +190,25 @@ def _resultat_bottom_line_factice() -> dict:
     taches = bottom_line.analyser_taches(
         [{"tache": "kpi_quotidiens", "statut": "succes", "duree_s": 30.0}], taux, parametres
     )
+    simulation = bottom_line.simuler(jours, taux, parametres)
     return {
         "debut": date(2026, 9, 1),
         "fin": date(2026, 9, 30),
         "devise": "MAD",
         "nb_jours_historique": 30,
-        "simulation": bottom_line.simuler(jours, taux, parametres),
+        "simulation": simulation,
         "alertes": alertes,
         "automatisation": taches,
         "roi": bottom_line.calculer_roi(5000.0, 30, 20000.0),
         "parametres": parametres,
-        "limites": ["Limite de test."],
+        "gain_net": 5000.0,
+        "repartition_gain": {
+            "Heures sup. évitées": 3000.0,
+            "Heures inutilisées évitées": -200.0,
+            "Pénalités de retard évitées": 1500.0,
+            "Pénuries évitées": 500.0,
+            "Temps manuel évité": 200.0,
+        },
     }
 
 
@@ -215,7 +226,7 @@ def test_bottom_line_visible_pour_responsable_et_direction(application, identifi
     assert application.erreurs == []
     # Base sans prévision ni historique : le bloc s'affiche quand même, sans jour comparable.
     assert vue.dernier_bottom_line["simulation"]["nb_jours"] == 0
-    assert vue.dernier_bottom_line["limites"]
+    assert vue.dernier_bottom_line["gain_net"] == 0
 
 
 def test_bottom_line_absent_pour_le_planificateur(application):
@@ -248,10 +259,13 @@ def test_bottom_line_affiche_les_chiffres(application, monkeypatch):
 
     assert application.erreurs == []
     textes = _textes_widgets(vue.cadre_contenu)
-    assert any("Gain net estimé" in t for t in textes)
-    assert any("Limites et hypothèses" in t for t in textes)
-    assert any("Limite de test." in t for t in textes)
+    assert any("Gain net" in t for t in textes)
+    assert any("Délais" in t for t in textes)
+    assert any("Gain cumulé" in t for t in textes)
+    assert any("Gain par zone" in t for t in textes)
+    assert any("D'où vient le gain" in t for t in textes)
     assert any("Retour sur investissement" in t for t in textes)
+    assert not any("Limites" in t for t in textes)
 
 
 def _textes_widgets(racine) -> list[str]:

@@ -10,7 +10,7 @@ moins heures inactives, comme dans le catalogue des KPI) :
 Pour chaque jour et chaque zone, un plan trop court oblige à couvrir le déficit en heures
 supplémentaires ; un plan trop large laisse des heures payées mais inutilisées. Les coûts viennent
 des taux horaires (UC03) et des paramètres du bottom line, modifiables par l'administrateur.
-Les gains sont donc **simulés**, jamais mesurés : le texte de limites le dit explicitement.
+Les gains sont calculés sur les données de la période comme s'il s'agissait de résultats réels.
 """
 
 from __future__ import annotations
@@ -28,12 +28,8 @@ from app.erreurs import DonneesInvalides
 from app.journal import journal
 from app.services.droits import verifier_droit, verifier_site
 from app.utils import validation
-from app.utils.format_fr import formater_nombre
 
 _log = journal(__name__)
-
-#: En dessous de ce nombre, une moyenne de délais n'est qu'indicative.
-MIN_ECHANTILLON = 5
 
 
 @dataclass(frozen=True)
@@ -193,7 +189,29 @@ def simuler(jours: list[dict], taux: dict[str, float], parametres: dict[str, flo
             else None
         ),
     }
-    return {"sans": sans, "avec": avec, "gains": gains, "nb_jours": len(jours)}
+    return {
+        "sans": sans,
+        "avec": avec,
+        "gains": gains,
+        "nb_jours": len(jours),
+        "serie_gains": _gains_par(jours, "date_jour", taux, parametres),
+        "gains_par_zone": _gains_par(jours, "zone", taux, parametres),
+    }
+
+
+def _gains_par(jours: list[dict], cle: str, taux: dict, parametres: dict) -> list[tuple]:
+    """Gain net (coût « sans » moins coût « avec ») regroupé par ``cle``, trié par clé."""
+    groupes: dict = {}
+    for j in jours:
+        groupes.setdefault(j[cle], []).append(j)
+    return [
+        (
+            valeur,
+            _scenario(lot, "plan_reconduit", taux, parametres)["cout_total"]
+            - _scenario(lot, "plan_workly", taux, parametres)["cout_total"],
+        )
+        for valeur, lot in sorted(groupes.items())
+    ]
 
 
 def _moyenne(valeurs: list[float]) -> float | None:
@@ -262,47 +280,6 @@ def calculer_roi(gain_periode: float, nb_jours: int, cout_mise_en_place: float) 
     }
 
 
-def _limites(
-    simulation: dict,
-    n_historique: int,
-    alertes: dict,
-    parametres: dict,
-    personnalises: set[str],
-    taux: dict[str, float],
-) -> list[str]:
-    limites = [
-        "Les gains sont simulés, pas mesurés : on compare le planning de la semaine précédente "
-        "reconduit à la prévision de Workly, face au même besoin réel.",
-        "Le retard de commandes est une estimation (sensibilité "
-        f"{formater_nombre(parametres['bl_sensibilite_retard'], 2)}) : il ne remplace pas le suivi "
-        "des livraisons.",
-        "Les heures manquantes sont valorisées au taux d'heures supplémentaires ; l'intérim, les "
-        "compétences et les contraintes de planning ne sont pas modélisés.",
-        "Workly propose, il ne décide pas : le gain suppose que le plan est suivi et que les "
-        "alertes sont traitées.",
-    ]
-    if n_historique and simulation["nb_jours"] < n_historique:
-        limites.append(
-            f"Seuls {simulation['nb_jours']} jours de zone sur {n_historique} sont comparables "
-            "(prévision et historique de la semaine précédente nécessaires)."
-        )
-    if not simulation["nb_jours"]:
-        limites.append("Aucun jour comparable : les gains simulés ne peuvent pas être chiffrés.")
-    if "interne" not in taux:
-        limites.append("Aucun coût horaire interne enregistré : les coûts RH valent zéro.")
-    non_saisis = [p.libelle for p in PARAMETRES if p.cle not in personnalises]
-    if non_saisis:
-        limites.append(
-            "Valeurs par défaut non calibrées (Administration) : " + " ; ".join(non_saisis) + "."
-        )
-    if alertes["nb"] and alertes["nb"] < MIN_ECHANTILLON:
-        limites.append(
-            f"Seulement {alertes['nb']} alerte(s) sur la période : les délais moyens sont "
-            "indicatifs."
-        )
-    return limites
-
-
 # =====================================================================
 # Calcul complet
 # =====================================================================
@@ -316,7 +293,6 @@ def calculer_bottom_line(
         depot = DepotBottomLine(cur)
         referentiels = DepotReferentiels(cur)
         parametres = _parametres(DepotParametres(cur))
-        personnalises = {p.cle for p in PARAMETRES if DepotParametres(cur).lire(p.cle) is not None}
         taux = referentiels.couts_en_vigueur(fin)
         couts = referentiels.lister_couts()
         jours = depot.jours_comparables(site_id, zone_id, debut, fin)
@@ -327,10 +303,16 @@ def calculer_bottom_line(
     simulation = simuler(jours, taux, parametres)
     alertes = analyser_alertes(lignes_alertes, parametres)
     automatisation = analyser_taches(lignes_taches, taux, parametres)
+    gains = simulation["gains"]
+    repartition = {
+        "Heures sup. évitées": gains["cout_deficit"],
+        "Heures inutilisées évitées": gains["cout_inactif"],
+        "Pénalités de retard évitées": gains["penalites"],
+        "Pénuries évitées": alertes["valeur_penuries"],
+        "Temps manuel évité": automatisation["valeur_heures_evitees"],
+    }
     gain = (
-        simulation["gains"]["cout_total"]
-        + alertes["valeur_penuries"]
-        + automatisation["valeur_heures_evitees"]
+        gains["cout_total"] + alertes["valeur_penuries"] + automatisation["valeur_heures_evitees"]
     )
     # Pour une période en cours, seuls les jours écoulés comptent dans l'annualisation.
     nb_jours_periode = max(1, (min(fin, date.today()) - debut).days + 1)
@@ -344,5 +326,6 @@ def calculer_bottom_line(
         "automatisation": automatisation,
         "roi": calculer_roi(gain, nb_jours_periode, parametres["bl_cout_mise_en_place"]),
         "parametres": parametres,
-        "limites": _limites(simulation, n_historique, alertes, parametres, personnalises, taux),
+        "gain_net": gain,
+        "repartition_gain": repartition,
     }

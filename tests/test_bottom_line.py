@@ -17,8 +17,10 @@ DEFAUTS = {p.cle: p.defaut for p in bottom_line.PARAMETRES}
 TAUX = {"interne": 10.0, "heures_sup": 15.0}
 
 
-def _jour(besoin, plan_workly, plan_reconduit, commandes=100):
+def _jour(besoin, plan_workly, plan_reconduit, commandes=100, jour=1, zone="Réception"):
     return {
+        "date_jour": date(2026, 9, jour),
+        "zone": zone,
         "besoin": besoin,
         "plan_workly": plan_workly,
         "plan_reconduit": plan_reconduit,
@@ -135,15 +137,21 @@ def test_roi_non_renseigne_sans_cout_de_mise_en_place():
     assert roi["roi_pct"] is None and roi["retour_mois"] is None
 
 
-def test_limites_signalent_l_absence_de_donnees_et_les_defauts():
-    simulation = bottom_line.simuler([], {}, DEFAUTS)
-    alertes = bottom_line.analyser_alertes([_alerte()], DEFAUTS)
-    texte = " ".join(bottom_line._limites(simulation, 12, alertes, DEFAUTS, set(), {}))
-    assert "simulés, pas mesurés" in texte
-    assert "Aucun jour comparable" in texte
-    assert "Aucun coût horaire interne" in texte
-    assert "Valeurs par défaut" in texte
-    assert "Seulement 1 alerte" in texte
+def test_simulation_series_par_jour_et_par_zone():
+    jours = [
+        _jour(100, 100, 80, jour=1, zone="A"),
+        _jour(100, 100, 80, jour=2, zone="B"),
+        _jour(100, 100, 100, jour=2, zone="A"),
+    ]
+    resultat = bottom_line.simuler(jours, TAUX, DEFAUTS)
+    par_jour = dict(resultat["serie_gains"])
+    par_zone = dict(resultat["gains_par_zone"])
+    assert list(par_jour) == [date(2026, 9, 1), date(2026, 9, 2)]
+    assert par_jour[date(2026, 9, 1)] > 0 and par_jour[date(2026, 9, 2)] > 0
+    assert par_zone["A"] == pytest.approx(par_jour[date(2026, 9, 1)])
+    assert par_zone["B"] > 0
+    assert sum(par_jour.values()) == pytest.approx(resultat["gains"]["cout_total"])
+    assert sum(par_zone.values()) == pytest.approx(resultat["gains"]["cout_total"])
 
 
 # ---------------------------------------------------------------------
@@ -214,7 +222,13 @@ def test_bottom_line_sur_la_demonstration(bd_vierge):
     assert simulation["sans"]["cout_total"] > 0
     assert resultat["nb_jours_historique"] >= simulation["nb_jours"]
     assert resultat["devise"] == "MAD"
-    assert resultat["limites"]
+    assert resultat["gain_net"] == pytest.approx(
+        simulation["gains"]["cout_total"]
+        + resultat["alertes"]["valeur_penuries"]
+        + resultat["automatisation"]["valeur_heures_evitees"]
+    )
+    assert set(resultat["repartition_gain"]) >= {"Heures sup. évitées", "Pénuries évitées"}
+    assert simulation["serie_gains"] and simulation["gains_par_zone"]
 
     # Filtrer sur une zone restreint les jours comparés.
     with transaction() as cur:
