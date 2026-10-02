@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -36,6 +37,13 @@ def _etiquettes_du_theme() -> None:
     ETIQUETTES["gris"] = {"foreground": COULEURS["gris"]}
     ETIQUETTES["inactif"] = {"foreground": COULEURS["desactive"]}
     ETIQUETTES["gras"] = {"font": ("", 10, "bold")}
+
+
+#: Largeur maximale donnée à une colonne pour afficher son contenu en entier ; au-delà, le texte
+#: reste lisible en survolant la cellule (info-bulle) ou en faisant défiler le tableau.
+_LARGEUR_MAX_COLONNE = 520
+#: Nombre de lignes mesurées pour ajuster les largeurs (les tableaux longs restent rapides).
+_LIGNES_MESUREES = 300
 
 
 @dataclass
@@ -150,6 +158,14 @@ class TableauTriable(ttk.Frame):
             yscrollcommand=self._defilement_auto(defil_v, "ns", 0, 1),
             xscrollcommand=self._defilement_auto(defil_h, "ew", 1, 0),
         )
+        self.arbre.bind("<Shift-MouseWheel>", self._defiler_horizontalement, add="+")
+        self.arbre.bind("<Motion>", self._survol_cellule, add="+")
+        self.arbre.bind("<Leave>", self._masquer_info_cellule, add="+")
+        self.arbre.bind("<ButtonPress>", self._masquer_info_cellule, add="+")
+        self.arbre.bind("<MouseWheel>", self._masquer_info_cellule, add="+")
+        self._info_cellule: tk.Toplevel | None = None
+        self._cellule_survolee: tuple[str, str] | None = None
+        self._minuterie_info: str | None = None
         self.arbre.grid(row=0, column=0, sticky="nsew")
         defil_v.grid(row=0, column=1, sticky="ns")
         defil_h.grid(row=1, column=0, sticky="ew")
@@ -173,6 +189,85 @@ class TableauTriable(ttk.Frame):
                 barre.grid(row=ligne, column=colonne, sticky=cote)
 
         return _commande
+
+    # --- Défilement horizontal et texte tronqué -----------------------------
+    def _defiler_horizontalement(self, evenement) -> str:
+        """Maj + molette : fait défiler le tableau de côté pour lire les colonnes cachées."""
+        self.arbre.xview_scroll(int(-1 * (evenement.delta / 120)) * 3, "units")
+        return "break"
+
+    def _police_lignes(self) -> tkfont.Font:
+        return tkfont.Font(
+            root=self, font=ttk.Style(self).lookup("Treeview", "font") or "TkDefaultFont"
+        )
+
+    def _ajuster_colonnes(self) -> None:
+        """Élargit les colonnes dont le contenu est plus long que la largeur prévue (jusqu'à
+        ``_LARGEUR_MAX_COLONNE``) : le tableau devient plus large que la place disponible et
+        l'ascenseur horizontal apparaît, au lieu de tronquer le texte."""
+        police = self._police_lignes()
+        identifiants = list(self._lignes)[:_LIGNES_MESUREES]
+        for colonne in self.colonnes:
+            contenu = max(
+                (police.measure(str(self.arbre.set(iid, colonne.cle))) for iid in identifiants),
+                default=0,
+            )
+            besoin = min(contenu + 28, _LARGEUR_MAX_COLONNE)
+            actuelle = int(self.arbre.column(colonne.cle, "width"))
+            if besoin > max(actuelle, colonne.largeur):
+                self.arbre.column(colonne.cle, width=besoin, minwidth=besoin)
+
+    def _survol_cellule(self, evenement) -> None:
+        """Affiche le texte complet d'une cellule rognée, après un court délai."""
+        iid = self.arbre.identify_row(evenement.y)
+        colonne = self.arbre.identify_column(evenement.x)
+        cellule = (iid, colonne) if iid and colonne != "#0" else None
+        if cellule == self._cellule_survolee:
+            return
+        self._masquer_info_cellule()
+        self._cellule_survolee = cellule
+        if cellule is None:
+            return
+        self._minuterie_info = self.after(
+            450, lambda: self._afficher_info_cellule(cellule, evenement.x_root, evenement.y_root)
+        )
+
+    def _afficher_info_cellule(self, cellule: tuple[str, str], x_root: int, y_root: int) -> None:
+        iid, colonne = cellule
+        if not self.arbre.exists(iid):
+            return
+        position = int(colonne.lstrip("#")) - 1
+        valeurs = self.arbre.item(iid, "values")
+        if not 0 <= position < len(valeurs):
+            return
+        texte = str(valeurs[position])
+        largeur_colonne = int(self.arbre.column(colonne, "width"))
+        if not texte or self._police_lignes().measure(texte) + 12 <= largeur_colonne:
+            return
+        self._info_cellule = tk.Toplevel(self)
+        self._info_cellule.wm_overrideredirect(True)
+        self._info_cellule.wm_geometry(f"+{x_root + 14}+{y_root + 18}")
+        cadre = tk.Frame(self._info_cellule, background=COULEURS["bordure"])
+        cadre.pack()
+        tk.Label(
+            cadre,
+            text=texte,
+            justify="left",
+            background=COULEURS["infobulle"],
+            foreground=COULEURS["texte"],
+            wraplength=520,
+            padx=8,
+            pady=5,
+        ).pack(padx=1, pady=1)
+
+    def _masquer_info_cellule(self, _evenement=None) -> None:
+        if self._minuterie_info is not None:
+            self.after_cancel(self._minuterie_info)
+            self._minuterie_info = None
+        if self._info_cellule is not None:
+            self._info_cellule.destroy()
+            self._info_cellule = None
+        self._cellule_survolee = None
 
     # --- Pulsation des alertes rouges ---------------------------------------
     def _pulser(self) -> None:
@@ -231,6 +326,7 @@ class TableauTriable(ttk.Frame):
         conserver = [iid for iid in selection if self.arbre.exists(iid)]
         if conserver:
             self.arbre.selection_set(conserver)
+        self._ajuster_colonnes()
         # Le tableau épouse son contenu (au moins quelques lignes, au plus ``hauteur``).
         self.arbre.configure(height=min(max(len(lignes), 4), self._hauteur_max))
         if lignes:
