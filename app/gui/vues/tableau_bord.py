@@ -9,6 +9,7 @@ from tkinter import ttk
 from app.erreurs import ErreurApplication
 from app.gui.style import COULEURS, COULEURS_STATUT, PUCE_STATUT
 from app.gui.vues.base import Vue
+from app.gui.vues.bloc_bottom_line import BlocBottomLine
 from app.gui.widgets.carte import Carte
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import afficher_erreur
@@ -109,7 +110,7 @@ def _serie(dates: list[date], valeurs_par_date: dict[date, float | None]) -> lis
     return [v if (v := valeurs_par_date.get(jour)) is not None else float("nan") for jour in dates]
 
 
-class VueTableauBord(Vue):
+class VueTableauBord(BlocBottomLine, Vue):
     """Filtres Site/Zone/Période, navigation de période, et contenu propre à chaque rôle
     (planificateur, responsable, direction), en cartes."""
 
@@ -521,6 +522,8 @@ class VueTableauBord(Vue):
             for colonne, v in enumerate(precision):
                 self._carte_indicateur_precision(ligne_precision, colonne, len(precision), v)
 
+        self._construire_bottom_line(site_id, zone_id, periodicite)
+
     def _carte_indicateur_precision(
         self, ligne: ttk.Frame, colonne: int, total: int, v: dict
     ) -> None:
@@ -624,6 +627,7 @@ class VueTableauBord(Vue):
         self._dessiner_taux_victoire(graphique_victoire, valeurs)
 
         self._construire_progression(site_id, zone_id)
+        self._construire_bottom_line(site_id, zone_id, periodicite)
 
     def _dessiner_tendances_12_mois(
         self, graphique: GraphiqueIntegre, site_id: int, zone_id: int | None

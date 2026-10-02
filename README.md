@@ -95,6 +95,33 @@ l'interface (carte, navigation, onglets en pilules, cartes d'indicateurs, tracé
 `app/gui/widgets/`. Les graphiques (anneau, jauge, barres arrondies, aires en dégradé) sont
 tracés avec matplotlib dans ces mêmes couleurs.
 
+## Bottom line : apports et limites
+
+Le tableau de bord du **responsable** et de la **direction** se termine par un bloc « Bottom
+line — apports et limites » (filtres site, zone et période du tableau de bord). Il chiffre ce que
+Workly change par rapport à un planning reconduit chaque semaine :
+
+| Volet | Contenu |
+|---|---|
+| Ressources humaines et heures | heures de travail mal allouées (déficit couvert en heures sup., heures payées inutilisées) et postes-jours évités, sans / avec Workly |
+| Coûts | coût des heures sup., des heures inutilisées et pénalités de retard, sans / avec Workly ; gain net estimé |
+| Délais | commandes en retard évitées et taux de service estimé |
+| Système d'alertes | alertes émises et traitées, délais de prise en charge et de résolution, part des alertes émises avant la date concernée |
+| Équipements et service | pénuries d'équipement traitées à l'avance et coût évité |
+| ROI et automatisation | gain annualisé, retour sur investissement, délai de rentabilisation, tâches automatiques exécutées et temps manuel évité |
+| Limites et hypothèses | texte généré avec les chiffres : couverture des jours comparables, valeurs par défaut non calibrées, ce que le modèle ne couvre pas |
+
+Méthode (`app/services/bottom_line.py`) : pour chaque jour et chaque zone, le **besoin réel**
+(heures travaillées moins heures inactives) est comparé au plan « sans Workly » (le réel du même
+jour de la semaine précédente) et au plan « avec Workly » (prévision d'heures de la méthode
+retenue pour le plan). Les gains sont donc **simulés, jamais mesurés**. Les heures manquantes sont
+valorisées au taux d'heures supplémentaires, les heures en trop au taux interne (coûts horaires de
+l'onglet Administration → Capacités et coûts).
+
+Cinq paramètres de valorisation se règlent dans la même carte « Paramètres du bottom line » :
+pénalité par commande en retard, part des commandes retardées par heure manquante, coût d'un
+jour de pénurie, coût de mise en place (pour le ROI) et temps manuel évité par tâche automatique.
+
 ## Tâches automatiques
 
 Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches
