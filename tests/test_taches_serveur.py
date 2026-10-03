@@ -136,6 +136,24 @@ def test_route_test_mail(adresse, monkeypatch):
     assert appeler(adresse, "/test-mail", "POST")[0] == 500
 
 
+def test_route_test_odoo(adresse, monkeypatch):
+    from app.taches import odoo
+
+    monkeypatch.setattr(
+        odoo, "tester_connexion", lambda: {"version": "17.0", "base": "b", "commandes_vente": 3}
+    )
+    assert appeler(adresse, "/test-odoo", "POST", jeton=None)[0] == 401
+    code, corps = appeler(adresse, "/test-odoo", "POST")
+    assert code == 200 and corps["statut"] == "succes" and corps["commandes_vente"] == 3
+
+    def refuse():
+        raise odoo.ErreurOdoo("Identifiants refusés")
+
+    monkeypatch.setattr(odoo, "tester_connexion", refuse)
+    code, corps = appeler(adresse, "/test-odoo", "POST")
+    assert code == 500 and corps["statut"] == "echec" and "refusés" in corps["erreur"]
+
+
 def test_aujourdhui_drapeaux_de_date():
     from datetime import datetime
 

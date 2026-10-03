@@ -14,6 +14,7 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
     GET  /aujourdhui          date du jour (UTC) et drapeaux : dimanche, lundi, 1er du mois, 1er
                               janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
+    POST /test-odoo           vérifie la connexion à Odoo (voir app/taches/odoo.py)
     POST /alerte?etape=<nom>  envoie un e-mail « échec de l'étape <nom> » (alerte d'un workflow)
     POST /taches-du-jour      lance, dans l'ordre, les tâches dues aujourd'hui (UTC) : dimanche
                               → capacites_semaine, lundi → hebdomadaire, le 1er → mensuel, le
@@ -200,6 +201,14 @@ def fabriquer_gestionnaire(jeton: str):
                     200 if envoye else 500,
                     {"statut": "succes" if envoye else "echec", "envoye": envoye},
                 )
+                return
+            if self.path == "/test-odoo":
+                from app.taches.odoo import ErreurOdoo, tester_connexion
+
+                try:
+                    self._repondre(200, {"statut": "succes", **tester_connexion()})
+                except ErreurOdoo as exc:
+                    self._repondre(500, {"statut": "echec", "erreur": str(exc)})
                 return
             if urlsplit(self.path).path == "/alerte":
                 from app.taches.notifications import envoyer
