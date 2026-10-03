@@ -23,9 +23,11 @@ if (-not (Test-Path $FichierJeton)) {
 }
 $env:WORKLY_TOKEN_TACHES = (Get-Content $FichierJeton -Raw).Trim()
 
-# Réglages d'alerte e-mail enregistrés une fois par configurer_alertes.ps1
+# Réglages d'alerte e-mail (configurer_alertes.ps1) et de connexion Odoo, enregistrés une fois
+# dans les variables d'environnement de l'utilisateur
 foreach ($nom in "WORKLY_SMTP_UTILISATEUR", "WORKLY_SMTP_MOT_DE_PASSE",
-    "WORKLY_ALERTE_DESTINATAIRE", "WORKLY_SMTP_PORT") {
+    "WORKLY_ALERTE_DESTINATAIRE", "WORKLY_SMTP_PORT",
+    "WORKLY_ODOO_URL", "WORKLY_ODOO_BASE", "WORKLY_ODOO_UTILISATEUR", "WORKLY_ODOO_CLE") {
     $valeur = [Environment]::GetEnvironmentVariable($nom, "User")
     if ($valeur) { Set-Item -Path "Env:$nom" -Value $valeur }
 }
