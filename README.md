@@ -137,7 +137,7 @@ jour de pénurie, coût de mise en place (pour le ROI) et temps manuel évité p
 
 ## Tâches automatiques
 
-Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches
+Douze tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches
 (`app/taches/planificateur.py`) :
 
 | Tâche | Cas d'utilisation | Fréquence par défaut |
