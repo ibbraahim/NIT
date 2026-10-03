@@ -70,3 +70,15 @@ def test_odoo_injoignable(env_odoo, monkeypatch):
     monkeypatch.setattr(odoo, "_proxy", lambda url, service: Injoignable())
     with pytest.raises(odoo.ErreurOdoo, match="injoignable"):
         odoo.tester_connexion()
+
+
+def test_connexion_valide_sans_droit_sur_les_ventes(env_odoo, monkeypatch):
+    import xmlrpc.client
+
+    class SansVentes(_Faux):
+        def execute_kw(self, *args):
+            raise xmlrpc.client.Fault(4, "You are not allowed to access 'Sales Order'")
+
+    monkeypatch.setattr(odoo, "_proxy", lambda url, service: SansVentes())
+    resultat = odoo.tester_connexion()
+    assert resultat["version"] == "17.0" and resultat["commandes_vente"] is None

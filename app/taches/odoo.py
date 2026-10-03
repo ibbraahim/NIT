@@ -63,9 +63,13 @@ def tester_connexion() -> dict:
             raise ErreurOdoo(
                 "Identifiants refusés : vérifiez la base, l'utilisateur et la clé API."
             )
-        commandes = _proxy(reglages["url"], "object").execute_kw(
-            reglages["base"], uid, reglages["cle"], "sale.order", "search_count", [[]]
-        )
+        try:
+            commandes = _proxy(reglages["url"], "object").execute_kw(
+                reglages["base"], uid, reglages["cle"], "sale.order", "search_count", [[]]
+            )
+        except xmlrpc.client.Fault:
+            # Connexion valide, mais le compte n'a pas (encore) accès aux ventes.
+            commandes = None
     except ErreurOdoo:
         raise
     except xmlrpc.client.Fault as exc:
