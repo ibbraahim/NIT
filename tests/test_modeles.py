@@ -136,7 +136,7 @@ def test_entrainement_historique_insuffisant(ctx_admin, site_zone):
     assert "insuffisant" in resume.avertissements[0]
 
 
-def test_entrainement_cree_quatre_versions_par_zone(ctx_admin, site_zone):
+def test_entrainement_cree_six_versions_par_zone(ctx_admin, site_zone):
     site_id, zone_id = site_zone
     _inserer_historique(site_id, zone_id)
     resume = modeles.entrainer_modeles(ctx_admin, site_id, zone_id)
@@ -146,12 +146,14 @@ def test_entrainement_cree_quatre_versions_par_zone(ctx_admin, site_zone):
         ("regression_lineaire", "equipements"),
         ("reseau_neurones", "heures"),
         ("reseau_neurones", "equipements"),
+        ("gradient_boosting", "heures"),
+        ("gradient_boosting", "equipements"),
     }
     for version in resume.versions:
         assert "mae" in version.metriques and "couverture_ic" in version.metriques
 
     versions_bd = modeles.lister_versions(ctx_admin, site_id, zone_id)
-    assert len(versions_bd) == 4
+    assert len(versions_bd) == 6
     assert all(not v["actif"] for v in versions_bd)  # jamais activé automatiquement
     rl_heures = next(
         v for v in versions_bd if v["methode"] == "regression_lineaire" and v["cible"] == "heures"
@@ -175,7 +177,7 @@ def test_entrainement_toutes_les_zones(ctx_admin, site_zone):
     _inserer_historique(site_id, zone_id_2)
     resume = modeles.entrainer_modeles(ctx_admin, site_id)  # zone_id=None : toutes les zones
     assert {v.zone_id for v in resume.versions} == {zone_id_1, zone_id_2}
-    assert len(resume.versions) == 8
+    assert len(resume.versions) == 12
 
 
 def test_entrainement_refuse_hors_administrateur(ctx_admin, site_zone, demo_referentiels):

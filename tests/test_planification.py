@@ -90,20 +90,21 @@ def _semer_capacites(site_id, zone_id, jours, effectif=10, absences=0):
 # ---------------------------------------------------------------------
 # UC11 · Générer les prévisions de ressources
 # ---------------------------------------------------------------------
-def test_generer_previsions_cree_rl_et_rn(ctx_planificateur, site_zone_modeles):
+def test_generer_previsions_cree_rl_rn_et_gb(ctx_planificateur, site_zone_modeles):
     site_id, zone_id = site_zone_modeles
     demain = date.today() + timedelta(days=1)
     dates = [demain + timedelta(days=i) for i in range(7)]
     _semer_previsions_volume(site_id, zone_id, dates)
 
     resume = planification.generer_previsions(ctx_planificateur, site_id, zone_id, 7)
-    assert resume.nb_lignes == 14  # 7 jours x 2 méthodes
+    assert resume.nb_lignes == 21  # 7 jours x 3 méthodes
     assert resume.avertissements == []
 
     lignes = planification.lister_previsions_ressources(ctx_planificateur, site_id, zone_id, 7)
     assert len(lignes) == 7
     for ligne in lignes:
-        assert ligne["heures_rl"] > 0 and ligne["heures_rn"] > 0
+        assert ligne["heures_rl"] > 0 and ligne["heures_rn"] > 0 and ligne["heures_gb"] > 0
+        assert ligne["ic_bas_gb"] <= ligne["heures_gb"] <= ligne["ic_haut_gb"]
         assert ligne["effectif_rl"] >= 1
         assert ligne["ic_bas_rl"] <= ligne["heures_rl"] <= ligne["ic_haut_rl"]
         assert ligne["modele_actif"] == "RL"  # méthode retenue par défaut dans le générateur
@@ -115,7 +116,7 @@ def test_generer_previsions_signale_volume_manquant(ctx_planificateur, site_zone
     _semer_previsions_volume(site_id, zone_id, [demain + timedelta(days=i) for i in range(5)])
 
     resume = planification.generer_previsions(ctx_planificateur, site_id, zone_id, 7)
-    assert resume.nb_lignes == 10  # 5 jours x 2 méthodes
+    assert resume.nb_lignes == 15  # 5 jours x 3 méthodes
     assert any("manquant" in a for a in resume.avertissements)
 
 
@@ -134,7 +135,7 @@ def test_generer_previsions_sans_modele_actif(ctx_planificateur, ctx_admin, site
 
     resume = planification.generer_previsions(ctx_planificateur, site_id, autre_zone, 7)
     assert resume.nb_lignes == 0
-    assert len(resume.avertissements) == 2  # une par méthode (RL, RN)
+    assert len(resume.avertissements) == 3  # une par méthode (RL, RN, GB)
     assert all("aucun modèle actif" in a.lower() for a in resume.avertissements)
 
 

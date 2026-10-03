@@ -141,7 +141,7 @@ def test_generer_rapport_pdf_excel_ecrit_les_deux_fichiers(ctx_responsable, site
 
 def _preparer_rapprochement_et_plan(ctx_admin, site_id: int, zone_id: int) -> None:
     """Historique entraînable, une prévision RL rapprochée au réel, et un plan de charge
-    validé, tous sur :data:`DATE_RAPPORT` (sections « Réel/RL/RN », « Comparaison RL vs RN »
+    validé, tous sur :data:`DATE_RAPPORT` (sections « Réel/RL/RN/GB », « Comparaison RL, RN et GB »
     et « Plan de charge validé et écarts » du rapport, UC23). Entraîner et activer un modèle
     (UC08, UC10) sont réservés à l'administrateur ; le reste (dépôts directs) est indifférent
     au rôle."""
@@ -218,19 +218,19 @@ def test_generer_rapport_couvre_les_sept_sections_uc23(ctx_admin, ctx_responsabl
     assert 1 <= len(contenu["synthese"]) <= 5
 
     classeur = load_workbook(DOSSIER_RAPPORTS / resultat["chemin_excel"])
-    # Une feuille par section tabulaire (3. KPI, 5. comparaison RL/RN, 6. alertes,
+    # Une feuille par section tabulaire (3. KPI, 5. comparaison RL/RN/GB, 6. alertes,
     # 7. plan de charge), plus la synthèse (2.) et l'équivalent tabulaire du graphique (4.).
     assert set(classeur.sheetnames) == {
         "Synthèse",
         "KPI",
-        "Réel RL RN",
-        "Comparaison RL RN",
+        "Réel RL RN GB",
+        "Comparaison RL RN GB",
         "Alertes",
         "Plan de charge",
     }
-    feuille_comparaison = classeur["Comparaison RL RN"]
+    feuille_comparaison = classeur["Comparaison RL RN GB"]
     lignes_comparaison = list(feuille_comparaison.iter_rows(values_only=True))
-    assert lignes_comparaison[0] == ("Métrique", "RL", "RN", "Meilleure méthode")
+    assert lignes_comparaison[0] == ("Métrique", "RL", "RN", "GB", "Meilleure méthode")
     assert len(lignes_comparaison) == 7  # en-tête + 6 métriques (5 formules + taux de victoire)
 
     feuille_plan = classeur["Plan de charge"]
@@ -239,7 +239,7 @@ def test_generer_rapport_couvre_les_sept_sections_uc23(ctx_admin, ctx_responsabl
     assert lignes_plan[1][0] == "Réception"  # zone
     assert lignes_plan[1][4] == "-4"  # écart effectif : 6 planifiés - 10 besoin
 
-    feuille_reel = classeur["Réel RL RN"]
+    feuille_reel = classeur["Réel RL RN GB"]
     lignes_reel = list(feuille_reel.iter_rows(values_only=True))
     assert len(lignes_reel) == 2  # en-tête + un jour de rapprochement
 
@@ -298,3 +298,41 @@ def test_exporter_rapport_refuse_hors_responsable(ctx_planificateur, ctx_respons
     )
     with pytest.raises(AccesRefuse):
         rapports.exporter_rapport(ctx_planificateur, resultat["rapport_id"], "pdf")
+
+
+def test_meilleure_methode_parmi_trois():
+    meilleure = rapports._meilleure_methode
+    valeurs = {"regression_lineaire": 5.0, "reseau_neurones": 3.0, "gradient_boosting": 4.0}
+    assert meilleure(valeurs, "bas") == "reseau_neurones"
+    assert meilleure(valeurs, "haut") == "regression_lineaire"
+    assert meilleure({**valeurs, "reseau_neurones": 5.0}, "haut") is None  # égalité en tête
+    assert meilleure({"regression_lineaire": 1.0, "gradient_boosting": None}, "bas") is None
+    zero = {"regression_lineaire": -4.0, "reseau_neurones": 1.0, "gradient_boosting": 3.0}
+    assert meilleure(zero, "zero") == "reseau_neurones"
+    quatre_vingt = {"regression_lineaire": 70.0, "reseau_neurones": 90.0, "gradient_boosting": 79.0}
+    assert meilleure(quatre_vingt, "80") == "gradient_boosting"
+
+
+def test_comparaison_rapport_a_une_colonne_par_methode():
+    ligne = {
+        "date_jour": date(2026, 3, 18),
+        "zone_id": 1,
+        "heures_prevues": 60.0,
+        "heures_reelles": 62.0,
+        "equipements_reels": None,
+        "equipements_prevus": 0,
+        "ic_bas": 50.0,
+        "ic_haut": 70.0,
+        "comparable": True,
+        "dans_ic": True,
+    }
+    lignes = {
+        "regression_lineaire": [ligne],
+        "reseau_neurones": [{**ligne, "heures_prevues": 61.5}],
+        "gradient_boosting": [{**ligne, "heures_prevues": 55.0}],
+    }
+    entetes, tableau = rapports._lignes_comparaison(lignes)
+    assert entetes == ["Métrique", "RL", "RN", "GB", "Meilleure méthode"]
+    assert all(len(l) == 5 for l in tableau)
+    mae = next(l for l in tableau if l[0].startswith("MAE"))
+    assert mae[1:] == ["2,00", "0,50", "7,00", "RN"]

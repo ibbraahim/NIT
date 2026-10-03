@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 
 import pytest
 
@@ -149,3 +149,136 @@ def test_tableau_de_bord_navigation_periode(application):
     application.racine.update()
     assert application.erreurs == []
     assert vue.periode_reference < reference_initiale
+
+
+# ---------------------------------------------------------------------
+# Bottom line (bloc du responsable et de la direction)
+# ---------------------------------------------------------------------
+def _resultat_bottom_line_factice() -> dict:
+    """Résultat complet (jours comparables, alertes, tâches) sans passer par la base."""
+    from datetime import datetime
+
+    from app.services import bottom_line
+
+    parametres = {p.cle: p.defaut for p in bottom_line.PARAMETRES}
+    taux = {"interne": 10.0, "heures_sup": 15.0}
+    jours = [
+        {
+            "date_jour": date(2026, 9, 1) + timedelta(days=rang),
+            "zone": "Réception" if rang % 2 else "Expédition",
+            "besoin": 100.0,
+            "plan_workly": 105.0,
+            "plan_reconduit": 80.0,
+            "duree_poste": 7.5,
+            "commandes_totales": 200,
+            "commandes_a_temps": 190,
+        }
+        for rang in range(5)
+    ]
+    creation = datetime(2026, 9, 1, 8, 0, tzinfo=UTC)
+    alerte = {
+        "type": "penurie_equipement",
+        "niveau": "rouge",
+        "statut": "resolue",
+        "zone_id": 1,
+        "date_concernee": date(2026, 9, 3),
+        "date_creation": creation,
+        "date_prise_en_charge": creation + timedelta(hours=2),
+        "date_resolution": creation + timedelta(hours=5),
+    }
+    alertes = bottom_line.analyser_alertes([alerte], parametres)
+    taches = bottom_line.analyser_taches(
+        [{"tache": "kpi_quotidiens", "statut": "succes", "duree_s": 30.0}], taux, parametres
+    )
+    simulation = bottom_line.simuler(jours, taux, parametres)
+    return {
+        "debut": date(2026, 9, 1),
+        "fin": date(2026, 9, 30),
+        "devise": "MAD",
+        "nb_jours_historique": 30,
+        "simulation": simulation,
+        "alertes": alertes,
+        "automatisation": taches,
+        "roi": bottom_line.calculer_roi(5000.0, 30, 20000.0),
+        "parametres": parametres,
+        "gain_net": 5000.0,
+        "repartition_gain": {
+            "Heures sup. évitées": 3000.0,
+            "Heures inutilisées évitées": -200.0,
+            "Pénalités de retard évitées": 1500.0,
+            "Pénuries évitées": 500.0,
+            "Temps manuel évité": 200.0,
+        },
+    }
+
+
+@pytest.mark.parametrize("identifiant", ["resp", "direction"])
+def test_bottom_line_visible_pour_responsable_et_direction(application, identifiant):
+    connecter(application, identifiant)
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+
+    assert application.erreurs == []
+    # Base sans prévision ni historique : le bloc s'affiche quand même, sans jour comparable.
+    assert vue.dernier_bottom_line["simulation"]["nb_jours"] == 0
+    assert vue.dernier_bottom_line["gain_net"] == 0
+
+
+def test_bottom_line_absent_pour_le_planificateur(application):
+    connecter(application, "planif")
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+
+    assert application.erreurs == []
+    assert not hasattr(vue, "dernier_bottom_line")
+
+
+def test_bottom_line_affiche_les_chiffres(application, monkeypatch):
+    from app.services import bottom_line
+
+    resultat = _resultat_bottom_line_factice()
+    monkeypatch.setattr(bottom_line, "calculer_bottom_line", lambda *_a, **_k: resultat)
+    connecter(application, "direction")
+    site_id = admin.lister_sites(application.contexte)[0]["id"]
+    application.naviguer("tableau_bord")
+    application.racine.update()
+    vue = application.vues["tableau_bord"]
+    vue.site.definir(site_id)
+    vue.actualiser_donnees()
+    application.racine.update()
+
+    assert application.erreurs == []
+    textes = _textes_widgets(vue.cadre_contenu)
+    assert any("Gain net" in t for t in textes)
+    assert any("Délais" in t for t in textes)
+    assert any("Gain cumulé" in t for t in textes)
+    assert any("Gain par zone" in t for t in textes)
+    assert any("D'où vient le gain" in t for t in textes)
+    assert any("Retour sur investissement" in t for t in textes)
+    assert not any("Limites" in t for t in textes)
+
+
+def _textes_widgets(racine) -> list[str]:
+    textes = []
+    pile = [racine]
+    while pile:
+        widget = pile.pop()
+        pile.extend(widget.winfo_children())
+        try:
+            textes.append(str(widget.cget("text")))
+        except Exception:  # noqa: BLE001, S110 - widget sans option « text »
+            pass
+        titre = getattr(widget, "_titre", None)
+        if titre:
+            textes.append(titre)
+    return textes

@@ -1,4 +1,4 @@
-"""UC20 · Comparer le réalisé aux prévisions RL et RN — UC21 · Détecter une dérive de modèle."""
+"""UC20 · Comparer le réalisé aux prévisions RL, RN et GB — UC21 · Détecter une dérive de modèle."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def _calculer_ecarts(r: dict) -> dict:
 
 
 # =====================================================================
-# UC20 · Comparer le réalisé aux prévisions RL et RN
+# UC20 · Comparer le réalisé aux prévisions RL, RN et GB
 # =====================================================================
 def comparer_realise(
     ctx: Contexte,
@@ -63,7 +63,7 @@ def comparer_realise(
     debut: date | None = None,
     fin: date | None = None,
 ) -> dict:
-    """Rapproche les dernières prévisions de ressources (RL et RN) au réel sur une période
+    """Rapproche les dernières prévisions de ressources (RL, RN et GB) au réel sur une période
     (hier par défaut, sur 7 jours), et persiste les écarts dans ``comparaisons_realise`` :
     matière première des KPI de précision (MAE, RMSE, MAPE, biais, couverture d'IC, écart
     d'équipements, taux de victoire) et de la détection de dérive (UC21)."""
@@ -113,7 +113,7 @@ def lister_comparaisons(
     fin: date | None = None,
     methode: str | None = None,
 ) -> list[dict]:
-    """Rapprochements réel/prévu, RL et RN, avec leurs écarts (écran Comparaison réel/prévu)."""
+    """Rapprochements réel/prévu, RL, RN et GB, avec leurs écarts (écran Comparaison réel/prévu)."""
     verifier_droit(ctx, "lecture_previsions")
     verifier_site(ctx, site_id)
     fin = fin or date.today() - timedelta(days=1)
@@ -132,7 +132,7 @@ def lister_comparaisons(
 # =====================================================================
 def detecter_derive(ctx: Contexte, site_id: int, date_reference: date | None = None) -> list[dict]:
     """Pour chaque zone du site, compare le MAPE hebdomadaire de la méthode retenue pour le
-    plan de charge (RL ou RN, ``retenue_pour_plan``) au seuil de dérive : au-delà, une alerte
+    plan de charge (RL, RN ou GB, ``retenue_pour_plan``) au seuil de dérive : au-delà, une alerte
     « derive_modele » est émise (orange), et confirmée en rouge si la semaine précédente était
     déjà en dérive. Renvoie les alertes émises ou mises à jour."""
     verifier_droit(ctx, "UC21")

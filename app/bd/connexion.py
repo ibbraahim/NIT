@@ -67,7 +67,33 @@ def _obtenir_pool() -> ThreadedConnectionPool:
             except psycopg2.Error as exc:
                 _log.exception("Échec de création du pool de connexions : %s", exc)
                 raise ErreurBaseDonnees(MESSAGE_CONNEXION) from exc
+            _migrer_schema(_pool)
         return _pool
+
+
+def _migrer_schema(pool: ThreadedConnectionPool) -> None:
+    """Évolutions du schéma pour les bases créées par une version antérieure (idempotent).
+
+    ``ALTER TYPE … ADD VALUE`` ne peut pas servir dans la transaction qui l'a créée : exécuté
+    en autocommit, une fois par ouverture de pool. Une base encore vide (type absent) n'a rien
+    à migrer : ``schema.sql`` contient déjà tout.
+    """
+    connexion = pool.getconn()
+    try:
+        connexion.autocommit = True
+        with connexion.cursor() as curseur:
+            try:
+                curseur.execute(
+                    "ALTER TYPE methode_prevision ADD VALUE IF NOT EXISTS 'gradient_boosting'"
+                )
+            except psycopg2.errors.UndefinedObject:
+                pass
+    except psycopg2.Error as exc:
+        _log.warning("Migration du schéma impossible : %s", exc)
+    finally:
+        if connexion.closed == 0:
+            connexion.autocommit = False
+        pool.putconn(connexion, close=connexion.closed != 0)
 
 
 def fermer_pool() -> None:

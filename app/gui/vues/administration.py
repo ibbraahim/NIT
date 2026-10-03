@@ -32,7 +32,7 @@ from app.libelles import (
     libelle,
 )
 from app.libelles import ROLES as LIBELLES_ROLES
-from app.services import admin
+from app.services import admin, bottom_line
 from app.utils.dates import jours_semaine, lundi_de
 from app.utils.format_fr import (
     formater_date,
@@ -582,7 +582,7 @@ class OngletCapacitesCouts(Onglet):
         self.message_grille.pack(anchor="w", pady=(6, 0))
 
         carte_couts = self.carte(
-            "Coûts horaires", "Taux par catégorie, applicables à partir d'une date", dernier=True
+            "Coûts horaires", "Taux par catégorie, applicables à partir d'une date"
         )
         couts = ttk.Frame(carte_couts.zone)
         couts.pack(fill="x")
@@ -611,6 +611,24 @@ class OngletCapacitesCouts(Onglet):
         self.cellules: dict[tuple[int, date], tuple[tk.StringVar, tk.StringVar, list]] = {}
         self._couts_actuels: dict[str, float] = {}
 
+        carte_bl = self.carte(
+            "Paramètres du bottom line",
+            "Valorisation des gains affichés dans le tableau de bord (responsable, direction)",
+            dernier=True,
+        )
+        grille_bl = ttk.Frame(carte_bl.zone)
+        grille_bl.pack(fill="x")
+        self.champs_bl: dict[str, ChampNombre] = {}
+        for rang, parametre in enumerate(bottom_line.PARAMETRES):
+            champ = ChampNombre(
+                grille_bl, f"{parametre.libelle} ({parametre.unite})", aide=parametre.aide
+            )
+            champ.grid(row=rang // 3, column=rang % 3, sticky="nw", padx=(0, 18), pady=(0, 8))
+            self.champs_bl[parametre.cle] = champ
+        Bouton(carte_bl.zone, "Enregistrer les paramètres", self.enregistrer_parametres_bl).pack(
+            anchor="w", pady=(6, 0)
+        )
+
     def actualiser(self) -> None:
         sites = self.vue.executer(lambda: admin.lister_sites(self.ctx))
         if sites is None:
@@ -618,6 +636,7 @@ class OngletCapacitesCouts(Onglet):
         self.site.definir_options([(s["id"], s["nom"]) for s in sites])
         self.charger_grille()
         self.charger_couts()
+        self.charger_parametres_bl()
 
     # --- Capacités -----------------------------------------------------
     def _lundi(self) -> date:
@@ -683,6 +702,29 @@ class OngletCapacitesCouts(Onglet):
             champ.effacer_erreur()
         self.devise.definir(couts[0]["devise"] if couts else configuration().devise)
         self.date_effet.definir(date.today())
+
+    def charger_parametres_bl(self) -> None:
+        valeurs = self.vue.executer(lambda: bottom_line.lire_parametres(self.ctx)) or {}
+        for cle, champ in self.champs_bl.items():
+            champ.definir(valeurs.get(cle))
+            champ.effacer_erreur()
+
+    def enregistrer_parametres_bl(self) -> None:
+        for champ in self.champs_bl.values():
+            champ.effacer_erreur()
+        saisies = {cle: champ.valeur() for cle, champ in self.champs_bl.items()}
+        try:
+            nombre = bottom_line.enregistrer_parametres(self.ctx, saisies)
+        except DonneesInvalides as exc:
+            for cle, message in exc.erreurs.items():
+                if cle in self.champs_bl:
+                    self.champs_bl[cle].signaler_erreur(message)
+            return
+        except ErreurApplication as exc:
+            afficher_erreur(self, exc.message)
+            return
+        informer(self, f"{nombre} paramètre(s) du bottom line enregistré(s).")
+        self.charger_parametres_bl()
 
     # --- Actions -------------------------------------------------------
     def enregistrer(self) -> None:

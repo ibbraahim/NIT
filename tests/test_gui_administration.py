@@ -140,3 +140,28 @@ def test_planificateur_demarrer_suspendre_et_journal(onglets_admin, application)
     application.racine.update()
     assert fenetre.tableau.lignes()
     fenetre.destroy()
+
+
+def test_parametres_du_bottom_line_enregistres_depuis_administration(application):
+    from app.services import bottom_line
+
+    connecter(application, "admin")
+    application.naviguer("administration")
+    application.racine.update()
+    capacites = application.vues["administration"].pages[3]  # OngletCapacitesCouts
+    capacites.actualiser()
+    assert capacites.champs_bl["bl_penalite_retard"].valeur() == "20"
+
+    capacites.champs_bl["bl_penalite_retard"].definir("42,5")
+    capacites.champs_bl["bl_sensibilite_retard"].definir("3")  # hors bornes (0 à 1)
+    capacites.enregistrer_parametres_bl()
+    assert application.infos == []
+    assert capacites.champs_bl["bl_sensibilite_retard"].message.cget("text")  # erreur affichée
+
+    capacites.champs_bl["bl_sensibilite_retard"].definir("0,8")
+    capacites.enregistrer_parametres_bl()
+    assert application.erreurs == []
+    assert application.infos  # confirmation
+    lus = bottom_line.lire_parametres(application.contexte)
+    assert lus["bl_penalite_retard"] == pytest.approx(42.5)
+    assert lus["bl_sensibilite_retard"] == pytest.approx(0.8)

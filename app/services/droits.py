@@ -45,6 +45,9 @@ DROITS: dict[str, frozenset[str]] = {
     # bien qu'il ne traite pas les alertes lui-même (UC19, réservé au planificateur/responsable).
     "lecture_alertes": frozenset({P, R, A, S}),
     "lecture_modeles": frozenset({A, R, S}),
+    # Bottom line (apports et limites) : tableau de bord du responsable et de la direction ;
+    # l'administrateur en lit les paramètres depuis l'écran Administration.
+    "lecture_bottom_line": frozenset({R, D, A}),
     "taches": frozenset({A, S}),
     # Reconduction automatique des capacités de la semaine suivante : droit étroit, accordé au
     # planificateur de tâches sans lui ouvrir le reste de UC03 (gestion des référentiels).
@@ -75,6 +78,7 @@ LIBELLES_DROITS = {
     "UC22": "consulter le tableau de bord",
     "UC23": "générer un rapport de performance",
     "UC24": "exporter un rapport",
+    "lecture_bottom_line": "consulter le bottom line",
     "taches": "piloter les tâches automatiques",
     "reconduction_capacites": "reconduire les capacités du personnel",
 }

@@ -116,13 +116,13 @@ def test_entrainement_complet_active_une_version(onglets_modeles, application, m
     page.entrainer()
     for _ in range(200):  # jusqu'à ~10 s : laisse le fil d'entraînement se terminer
         application.racine.update()
-        if len(page.tableau.lignes()) >= 4:
+        if len(page.tableau.lignes()) >= 6:
             break
         time.sleep(0.05)
 
     assert application.erreurs == []
     versions = page.tableau.lignes()
-    assert len(versions) == 4
+    assert len(versions) == 6  # 3 méthodes x 2 cibles
     assert all(not v["actif"] for v in versions)
 
     candidate = next(

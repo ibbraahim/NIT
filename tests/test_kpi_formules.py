@@ -163,6 +163,35 @@ def test_calculer_taux_victoire():
     assert kpi.calculer_taux_victoire(rl, rn) == pytest.approx(50.0)
 
 
+def test_calculer_taux_victoire_face_a_deux_autres_methodes():
+    """La victoire exige l'erreur la plus faible, strictement, face à chaque autre méthode."""
+    rl = [
+        _rappro(date(2026, 1, 1), 100.0, 90.0),  # erreur 10
+        _rappro(date(2026, 1, 2), 100.0, 100.0),  # erreur 0 : RL gagne face à RN et GB
+        _rappro(date(2026, 1, 3), 100.0, 98.0),  # erreur 2 : battu par GB
+    ]
+    rn = [
+        _rappro(date(2026, 1, 1), 100.0, 95.0),  # erreur 5
+        _rappro(date(2026, 1, 2), 100.0, 110.0),  # erreur 10
+        _rappro(date(2026, 1, 3), 100.0, 90.0),  # erreur 10
+    ]
+    gb = [
+        _rappro(date(2026, 1, 1), 100.0, 99.0),  # erreur 1 : GB gagne
+        _rappro(date(2026, 1, 2), 100.0, 105.0),  # erreur 5
+        _rappro(date(2026, 1, 3), 100.0, 99.0),  # erreur 1 : GB gagne
+    ]
+    assert kpi.calculer_taux_victoire(rl, rn, gb) == pytest.approx(100 / 3)
+    assert kpi.calculer_taux_victoire(rn, rl, gb) == pytest.approx(0.0)
+    assert kpi.calculer_taux_victoire(gb, rl, rn) == pytest.approx(200 / 3)
+
+
+def test_calculer_taux_victoire_ignore_les_jours_absents_d_une_methode():
+    rl = [_rappro(date(2026, 1, 1), 100.0, 100.0), _rappro(date(2026, 1, 2), 100.0, 100.0)]
+    rn = [_rappro(date(2026, 1, 1), 100.0, 90.0), _rappro(date(2026, 1, 2), 100.0, 90.0)]
+    gb = [_rappro(date(2026, 1, 1), 100.0, 90.0)]  # pas de 2 janvier
+    assert kpi.calculer_taux_victoire(rl, rn, gb) == pytest.approx(100.0)  # 1 seul jour commun
+
+
 def test_calculer_taux_victoire_aucun_jour_commun():
     rl = [_rappro(date(2026, 1, 1), 100.0, 90.0)]
     rn = [_rappro(date(2026, 1, 2), 100.0, 90.0)]

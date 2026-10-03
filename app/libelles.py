@@ -27,8 +27,9 @@ CATEGORIES_COUT = {
 METHODES = {
     "regression_lineaire": "Régression linéaire (RL)",
     "reseau_neurones": "Réseau de neurones (RN)",
+    "gradient_boosting": "Gradient boosting (GB)",
 }
-METHODES_COURTES = {"regression_lineaire": "RL", "reseau_neurones": "RN"}
+METHODES_COURTES = {"regression_lineaire": "RL", "reseau_neurones": "RN", "gradient_boosting": "GB"}
 
 CIBLES_MODELE = {"heures": "Heures nécessaires", "equipements": "Équipements mobilisés"}
 

@@ -95,6 +95,46 @@ l'interface (carte, navigation, onglets en pilules, cartes d'indicateurs, tracé
 `app/gui/widgets/`. Les graphiques (anneau, jauge, barres arrondies, aires en dégradé) sont
 tracés avec matplotlib dans ces mêmes couleurs.
 
+## Méthodes de prévision
+
+Trois méthodes sont entraînées, évaluées et comparées sur les mêmes données (scikit-learn,
+`app/ml/entrainement.py`) : la **régression linéaire** (RL), le **réseau de neurones** (RN) et le
+**gradient boosting** (GB, arbres de décision boostés). Chacune produit des heures, un effectif et
+des équipements par zone et par jour, avec un intervalle de confiance. L'écran Modèles règle leurs
+hyperparamètres ; l'activation d'une version, et le choix de la méthode retenue pour le plan de
+charge, restent une décision de l'administrateur (jamais automatique). Le taux de victoire d'une
+méthode est la part des jours où son erreur est strictement la plus faible face aux deux autres.
+
+Les bases créées avant l'ajout du gradient boosting sont migrées automatiquement à l'ouverture
+(nouvelle valeur du type `methode_prevision`), sans réinitialisation.
+
+## Bottom line : l'impact de Workly
+
+Le tableau de bord du **responsable** et de la **direction** se termine par un bloc « Bottom
+line — l'impact de Workly » (filtres site, zone et période du tableau de bord). Il chiffre ce que
+Workly change par rapport à un planning reconduit chaque semaine :
+
+| Volet | Contenu |
+|---|---|
+| Ressources humaines et heures | heures de travail mal allouées (déficit couvert en heures sup., heures payées inutilisées) et postes-jours évités, sans / avec Workly |
+| Coûts | coût des heures sup., des heures inutilisées et pénalités de retard, sans / avec Workly ; gain net |
+| Délais | commandes en retard évitées et taux de service estimé |
+| Système d'alertes | alertes émises et traitées, délais de prise en charge et de résolution, part des alertes émises avant la date concernée |
+| Équipements et service | pénuries d'équipement traitées à l'avance et coût évité |
+| ROI et automatisation | gain annualisé, retour sur investissement, délai de rentabilisation, tâches automatiques exécutées et temps manuel évité |
+| Graphiques | anneau des commandes en retard évitées, jauge du taux de service, indices « sans Workly = 100 » (coût, gaspillage, heures sup., pénalités), gain cumulé jour après jour, gain par zone, répartition du gain |
+
+Méthode (`app/services/bottom_line.py`) : pour chaque jour et chaque zone, le **besoin réel**
+(heures travaillées moins heures inactives) est comparé au plan « sans Workly » (le réel du même
+jour de la semaine précédente) et au plan « avec Workly » (prévision d'heures de la méthode
+retenue pour le plan). Les heures manquantes sont
+valorisées au taux d'heures supplémentaires, les heures en trop au taux interne (coûts horaires de
+l'onglet Administration → Capacités et coûts).
+
+Cinq paramètres de valorisation se règlent dans la même carte « Paramètres du bottom line » :
+pénalité par commande en retard, part des commandes retardées par heure manquante, coût d'un
+jour de pénurie, coût de mise en place (pour le ROI) et temps manuel évité par tâche automatique.
+
 ## Tâches automatiques
 
 Neuf tâches, journalisées dans `journal_taches` et visibles depuis Administration → Tâches

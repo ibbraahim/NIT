@@ -9,11 +9,17 @@ from tkinter import ttk
 from app.erreurs import ErreurApplication
 from app.gui.style import COULEURS, COULEURS_STATUT, PUCE_STATUT
 from app.gui.vues.base import Vue
+from app.gui.vues.bloc_bottom_line import BlocBottomLine
 from app.gui.widgets.carte import Carte
 from app.gui.widgets.champs import ChampListe
 from app.gui.widgets.dialogues import afficher_erreur
 from app.gui.widgets.entete import BoutonIcone
-from app.gui.widgets.graphique import GraphiqueIntegre, legende_en_haut, remplissage_degrade
+from app.gui.widgets.graphique import (
+    GraphiqueIntegre,
+    couleur_methode,
+    legende_en_haut,
+    remplissage_degrade,
+)
 from app.gui.widgets.kpi import CarteHero, carte_stat
 from app.gui.widgets.tableau_triable import Colonne, TableauTriable
 from app.gui.widgets.traces import anneau, barres_groupees, jauge
@@ -109,7 +115,7 @@ def _serie(dates: list[date], valeurs_par_date: dict[date, float | None]) -> lis
     return [v if (v := valeurs_par_date.get(jour)) is not None else float("nan") for jour in dates]
 
 
-class VueTableauBord(Vue):
+class VueTableauBord(BlocBottomLine, Vue):
     """Filtres Site/Zone/Période, navigation de période, et contenu propre à chaque rôle
     (planificateur, responsable, direction), en cartes."""
 
@@ -499,7 +505,7 @@ class VueTableauBord(Vue):
             0,
             2,
             "Réel contre prévisions",
-            "Heures par semaine : réalisé, régression (RL), réseau (RN)",
+            "Heures par semaine : réalisé, régression (RL), réseau (RN), boosting (GB)",
         )
         self._dessiner_reel_vs_previsions(graphique_heures, site_id)
         comptes = {"vert": 0, "orange": 0, "rouge": 0, "gris": 0}
@@ -520,6 +526,8 @@ class VueTableauBord(Vue):
             ligne_precision = self._rangee([1] * len(precision))
             for colonne, v in enumerate(precision):
                 self._carte_indicateur_precision(ligne_precision, colonne, len(precision), v)
+
+        self._construire_bottom_line(site_id, zone_id, periodicite)
 
     def _carte_indicateur_precision(
         self, ligne: ttk.Frame, colonne: int, total: int, v: dict
@@ -556,7 +564,13 @@ class VueTableauBord(Vue):
         for r in rapprochements:
             semaine = lundi_de(r["date_jour"])
             acc = semaines.setdefault(
-                semaine, {"reel": 0.0, "regression_lineaire": 0.0, "reseau_neurones": 0.0}
+                semaine,
+                {
+                    "reel": 0.0,
+                    "regression_lineaire": 0.0,
+                    "reseau_neurones": 0.0,
+                    "gradient_boosting": 0.0,
+                },
             )
             acc[r["methode"]] += r["heures_prevues"] or 0.0
             vues = zones_vues_par_jour.setdefault(r["date_jour"], set())
@@ -601,6 +615,15 @@ class VueTableauBord(Vue):
                 color=COULEURS["vert"],
                 label="Prévu (RN)",
             )
+            axe.plot(
+                libelles,
+                [v["gradient_boosting"] for _, v in points],
+                marker="o",
+                markersize=3,
+                linewidth=1.8,
+                color=couleur_methode("gradient_boosting"),
+                label="Prévu (GB)",
+            )
             axe.set_ylabel("Heures / semaine")
             legende_en_haut(axe)
 
@@ -618,12 +641,18 @@ class VueTableauBord(Vue):
             ligne, 0, 2, "Tendances sur 12 mois", "Adéquation de l'effectif et commandes à temps"
         )
         graphique_victoire = self._carte_graphique(
-            ligne, 1, 2, "Taux de victoire", "Régression linéaire contre réseau de neurones", 3.4
+            ligne,
+            1,
+            2,
+            "Taux de victoire",
+            "Régression linéaire, réseau de neurones et gradient boosting",
+            3.4,
         )
         self._dessiner_tendances_12_mois(graphique_tendances, site_id, zone_id)
         self._dessiner_taux_victoire(graphique_victoire, valeurs)
 
         self._construire_progression(site_id, zone_id)
+        self._construire_bottom_line(site_id, zone_id, periodicite)
 
     def _dessiner_tendances_12_mois(
         self, graphique: GraphiqueIntegre, site_id: int, zone_id: int | None
@@ -689,7 +718,11 @@ class VueTableauBord(Vue):
         def _dessiner(axe):
             methodes = [METHODES_COURTES.get(v["methode"], v["methode"]) for v in lignes]
             valeurs_pct = [v["valeur"] for v in lignes]
-            couleurs = [COULEURS["primaire"], COULEURS["orange"]]
+            couleurs = [
+                COULEURS["primaire"],
+                COULEURS["orange"],
+                couleur_methode("gradient_boosting"),
+            ]
             for rang, valeur in enumerate(valeurs_pct):
                 barres_groupees(
                     axe,
@@ -697,7 +730,7 @@ class VueTableauBord(Vue):
                     [
                         (
                             [valeur if i == rang else None for i in range(len(methodes))],
-                            couleurs[rang % 2],
+                            couleurs[rang % 3],
                             None,
                         )
                     ],

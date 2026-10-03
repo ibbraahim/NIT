@@ -39,6 +39,7 @@ JOURS_SEMAINE_VALIDES = preparation.JOURS_SEMAINE
 DEFAUT_PARAMETRES: dict = {
     "variables_actives": list(preparation.VARIABLES_PAR_DEFAUT),
     "hyperparametres_rn": dict(entrainement.HYPERPARAMETRES_RN_PAR_DEFAUT),
+    "hyperparametres_gb": dict(entrainement.HYPERPARAMETRES_GB_PAR_DEFAUT),
     "part_test": 0.2,
     "niveau_confiance": 0.8,
     "seuil_derive_mape": 10.0,
@@ -116,6 +117,28 @@ def _valider_configuration(configuration: dict) -> dict:
         }
     except ValueError as exc:
         erreurs["hyperparametres_rn"] = str(exc)
+
+    hyper_gb = configuration.get("hyperparametres_gb") or dict(
+        entrainement.HYPERPARAMETRES_GB_PAR_DEFAUT
+    )
+    try:
+        resultat["hyperparametres_gb"] = {
+            "n_estimators": int(
+                validation.nombre(
+                    hyper_gb.get("n_estimators"), "Nombre d'arbres", 10, 2000, entier=True
+                )
+            ),
+            "learning_rate": validation.nombre(
+                hyper_gb.get("learning_rate"), "Taux d'apprentissage", 0.001, 1
+            ),
+            "max_depth": int(
+                validation.nombre(
+                    hyper_gb.get("max_depth"), "Profondeur des arbres", 1, 10, entier=True
+                )
+            ),
+        }
+    except ValueError as exc:
+        erreurs["hyperparametres_gb"] = str(exc)
 
     try:
         resultat["part_test"] = validation.nombre(
@@ -261,6 +284,7 @@ def entrainer_modeles(
                         config["part_test"],
                         config["niveau_confiance"],
                         config["hyperparametres_rn"],
+                        config["hyperparametres_gb"],
                     )
                     statut = "retenue" if resultat.convergence_ok else "non_retenue"
                     if not resultat.convergence_ok:

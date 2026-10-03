@@ -1,4 +1,4 @@
-"""UC11 · Générer les prévisions de ressources (RL et RN) — UC12 · Élaborer le plan de
+"""UC11 · Générer les prévisions de ressources (RL, RN et GB) — UC12 · Élaborer le plan de
 charge (inclut UC11) — UC13 · Simuler un scénario (étend UC12) — UC14 · Valider le plan de
 charge.
 """
@@ -53,16 +53,18 @@ def generer_previsions(
     zone_id: int | None = None,
     horizon_jours: int = 7,
     progression: Progression | None = None,
+    date_reference: date | None = None,
 ) -> ResumeGenerationPrevisions:
-    """UC11 : calcule, avec RL et RN, les heures, l'effectif et les équipements nécessaires
-    pour chaque date de l'horizon. Une date sans demande client est ignorée et signalée."""
+    """UC11 : calcule, avec RL, RN et GB, les heures, l'effectif et les équipements nécessaires
+    pour chaque date de l'horizon (à partir du lendemain de ``date_reference``, aujourd'hui par
+    défaut). Une date sans demande client est ignorée et signalée."""
     verifier_droit(ctx, "UC11")
     verifier_site(ctx, site_id)
     if horizon_jours not in HORIZONS_VALIDES:
         raise ValueError(f"Horizon invalide : « {horizon_jours} » jours.")
 
     resume = ResumeGenerationPrevisions()
-    debut = date.today() + timedelta(days=1)
+    debut = (date_reference or date.today()) + timedelta(days=1)
     dates_horizon = [debut + timedelta(days=i) for i in range(horizon_jours)]
 
     with transaction() as cur:
@@ -195,7 +197,7 @@ def generer_previsions(
 def lister_previsions_ressources(
     ctx: Contexte, site_id: int, zone_id: int | None = None, horizon_jours: int = 7
 ) -> list[dict]:
-    """Prévisions RL et RN, une ligne par zone et par date (écran Prévisions)."""
+    """Prévisions RL, RN et GB, une ligne par zone et par date (écran Prévisions)."""
     verifier_droit(ctx, "lecture_previsions")
     verifier_site(ctx, site_id)
     debut = date.today() + timedelta(days=1)

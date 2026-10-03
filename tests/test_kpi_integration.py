@@ -83,7 +83,7 @@ def test_calculer_kpi_calcule_les_kpi_sans_methode(ctx_responsable, site_zone_mo
     assert par_code["PRODUCTIVITE"]["statut"] == "gris"
 
 
-def test_calculer_kpi_les_deux_methodes_pour_un_kpi_de_precision(
+def test_calculer_kpi_les_trois_methodes_pour_un_kpi_de_precision(
     ctx_responsable, site_zone_modeles
 ):
     site_id, zone_id = site_zone_modeles
@@ -91,7 +91,7 @@ def test_calculer_kpi_les_deux_methodes_pour_un_kpi_de_precision(
         ctx_responsable, site_id, zone_id, "jour", date_reference=date(2026, 1, 6)
     )
     methodes = {v["methode"] for v in valeurs if v["kpi_code"] == "MAE_H"}
-    assert methodes == {"regression_lineaire", "reseau_neurones"}
+    assert methodes == {"regression_lineaire", "reseau_neurones", "gradient_boosting"}
 
 
 def test_comparer_kpi_cibles_affecte_un_statut(ctx_responsable, site_zone_modeles):

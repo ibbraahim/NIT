@@ -62,3 +62,27 @@ def test_contraintes_du_schema(bd_vierge):
         with transaction() as cur:
             cur.execute("INSERT INTO sites (nom) VALUES ('A')")
             cur.execute("INSERT INTO plans_charge (site_id, semaine) VALUES (1, '2026-03-10')")
+
+
+def test_migration_ajoute_gradient_boosting_a_une_base_ancienne(base_test):
+    """Une base créée avant le gradient boosting reçoit la valeur d'énuméré à l'ouverture."""
+    from app.bd import connexion as bd
+    from app.bd.init_bd import CHEMIN_SCHEMA, creer_base, supprimer_base
+
+    ancienne = base_test.avec_base(f"{base_test.base}_ancienne")
+    creer_base(ancienne)
+    try:
+        bd.definir_configuration(ancienne)
+        schema = CHEMIN_SCHEMA.read_text(encoding="utf-8").replace(
+            "ENUM ('regression_lineaire', 'reseau_neurones', 'gradient_boosting')",
+            "ENUM ('regression_lineaire', 'reseau_neurones')",
+        )
+        with bd.transaction() as cur:  # le pool est ouvert avant le schéma : rien à migrer
+            cur.execute(schema)
+        bd.definir_configuration(ancienne)  # ferme le pool : la prochaine ouverture migre
+        with bd.transaction() as cur:
+            cur.execute("SELECT enum_range(NULL::methode_prevision)::text AS valeurs")
+            assert "gradient_boosting" in cur.fetchone()["valeurs"]
+    finally:
+        bd.definir_configuration(base_test)
+        supprimer_base(ancienne)

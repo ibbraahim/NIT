@@ -18,10 +18,20 @@ from matplotlib.colors import to_rgb  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 from matplotlib.patches import Polygon  # noqa: E402
 
-from app.gui.style import COULEURS, a_chaque_theme  # noqa: E402
+from app.gui.style import COULEUR_ACCENT_5, COULEURS, a_chaque_theme  # noqa: E402
 
 #: Palette de séries, dans l'ordre d'utilisation habituel (réel, RL, RN, capacité…).
 COULEURS_SERIES: list[str] = []
+
+
+def couleur_methode(methode: str) -> str:
+    """Couleur d'une méthode de prévision, la même dans tous les graphiques (RL orange, RN vert,
+    GB magenta) ; suit le thème courant."""
+    return {
+        "regression_lineaire": COULEURS["orange"],
+        "reseau_neurones": COULEURS["vert"],
+        "gradient_boosting": COULEUR_ACCENT_5,
+    }[methode]
 
 
 @a_chaque_theme

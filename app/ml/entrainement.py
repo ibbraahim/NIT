@@ -1,4 +1,4 @@
-"""Entraînement et évaluation des modèles RL et RN (UC08, UC09).
+"""Entraînement et évaluation des modèles RL, RN et GB (UC08, UC09).
 
 Découpage chronologique (jamais aléatoire) : les lignes les plus anciennes servent à
 l'apprentissage, les plus récentes au test. Graine aléatoire fixée à 42 partout, pour des
@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
@@ -28,10 +29,17 @@ HYPERPARAMETRES_RN_PAR_DEFAUT = {
     "max_iter": 2000,
 }
 
-METHODES = ("regression_lineaire", "reseau_neurones")
+HYPERPARAMETRES_GB_PAR_DEFAUT = {
+    "n_estimators": 200,
+    "learning_rate": 0.05,
+    "max_depth": 3,
+}
+
+METHODES = ("regression_lineaire", "reseau_neurones", "gradient_boosting")
 LIBELLES_METHODES = {
     "regression_lineaire": "Régression linéaire",
     "reseau_neurones": "Réseau de neurones",
+    "gradient_boosting": "Gradient boosting",
 }
 
 
@@ -90,6 +98,26 @@ def _construire_pipeline_rn(hyperparametres: dict) -> Pipeline:
     )
 
 
+def _construire_pipeline_gb(hyperparametres: dict) -> Pipeline:
+    """Arbres de décision boostés : insensibles à l'échelle des variables, donc sans
+    normalisation. ``subsample < 1`` rend chaque arbre un peu différent (graine fixée)."""
+    parametres = {**HYPERPARAMETRES_GB_PAR_DEFAUT, **(hyperparametres or {})}
+    return Pipeline(
+        [
+            (
+                "boosting",
+                GradientBoostingRegressor(
+                    n_estimators=parametres["n_estimators"],
+                    learning_rate=parametres["learning_rate"],
+                    max_depth=parametres["max_depth"],
+                    subsample=0.8,
+                    random_state=GRAINE_ALEATOIRE,
+                ),
+            )
+        ]
+    )
+
+
 def calculer_metriques(y_reel: pd.Series, y_predit: np.ndarray) -> dict[str, float]:
     """MAE, RMSE, MAPE (jours à réel nul exclus) et biais (%)."""
     ecarts = y_reel.to_numpy() - y_predit
@@ -129,6 +157,15 @@ def coefficients_lisibles(pipeline: Pipeline, colonnes: list[str]) -> dict[str, 
     return coefficients
 
 
+def importances_lisibles(pipeline: Pipeline, colonnes: list[str]) -> dict[str, float]:
+    """Importance relative (somme = 1) de chaque variable pour le gradient boosting."""
+    modele = pipeline.named_steps["boosting"]
+    return {
+        libelle_colonne(nom): float(valeur)
+        for nom, valeur in zip(colonnes, modele.feature_importances_, strict=True)
+    }
+
+
 def entrainer_et_evaluer(
     x: pd.DataFrame,
     y: pd.Series,
@@ -136,6 +173,7 @@ def entrainer_et_evaluer(
     part_test: float = 0.2,
     niveau_confiance: float = 0.8,
     hyperparametres_rn: dict | None = None,
+    hyperparametres_gb: dict | None = None,
 ) -> ResultatEntrainement:
     """Entraîne et évalue une méthode (UC08 + UC09) sur un jeu de données déjà trié par date."""
     x_train, x_test, y_train, y_test = decouper_chronologique(x, y, part_test)
@@ -151,6 +189,10 @@ def entrainer_et_evaluer(
             pipeline.fit(x_train, y_train)
         convergence_ok = not any(issubclass(w.category, ConvergenceWarning) for w in capturees)
         coefficients = None
+    elif methode == "gradient_boosting":
+        pipeline = _construire_pipeline_gb(hyperparametres_gb or {})
+        pipeline.fit(x_train, y_train)
+        coefficients = importances_lisibles(pipeline, list(x.columns))
     else:
         raise ValueError(f"Méthode de prévision inconnue : « {methode} ».")
 
@@ -183,11 +225,12 @@ def entrainer_methodes(
     part_test: float = 0.2,
     niveau_confiance: float = 0.8,
     hyperparametres_rn: dict | None = None,
+    hyperparametres_gb: dict | None = None,
 ) -> dict[str, ResultatEntrainement]:
-    """Entraîne et évalue les deux méthodes (RL et RN) sur le même jeu de données."""
+    """Entraîne et évalue les trois méthodes (RL, RN et GB) sur le même jeu de données."""
     return {
         methode: entrainer_et_evaluer(
-            x, y, methode, part_test, niveau_confiance, hyperparametres_rn
+            x, y, methode, part_test, niveau_confiance, hyperparametres_rn, hyperparametres_gb
         )
         for methode in METHODES
     }

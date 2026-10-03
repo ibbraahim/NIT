@@ -10,7 +10,7 @@
 CREATE TYPE role_utilisateur AS ENUM ('planificateur', 'responsable', 'direction', 'administrateur');
 CREATE TYPE statut_equipement AS ENUM ('disponible', 'maintenance', 'hors_service');
 CREATE TYPE categorie_cout AS ENUM ('interne', 'heures_sup', 'interim');
-CREATE TYPE methode_prevision AS ENUM ('regression_lineaire', 'reseau_neurones');
+CREATE TYPE methode_prevision AS ENUM ('regression_lineaire', 'reseau_neurones', 'gradient_boosting');
 CREATE TYPE cible_modele AS ENUM ('heures', 'equipements');
 CREATE TYPE statut_version AS ENUM ('retenue', 'non_retenue');
 CREATE TYPE statut_plan AS ENUM ('brouillon', 'soumis', 'valide', 'rejete');

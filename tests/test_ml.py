@@ -159,10 +159,51 @@ def test_entrainement_reseau_neurones_produit_des_metriques():
     assert set(resultat.metriques) >= {"mae", "rmse", "mape", "biais", "couverture_ic"}
 
 
-def test_entrainer_methodes_renvoie_les_deux():
+def test_entrainement_gradient_boosting_apprend_la_relation():
+    x, y = _jeu_lineaire()
+    resultat = entrainement.entrainer_et_evaluer(x, y, "gradient_boosting")
+    assert resultat.methode == "gradient_boosting"
+    assert resultat.convergence_ok is True
+    assert resultat.nb_lignes_apprentissage == 120 and resultat.nb_lignes_test == 30
+    assert set(resultat.metriques) >= {"mae", "rmse", "mape", "biais", "couverture_ic"}
+    # Les arbres plafonnent en bordure du domaine d'apprentissage, mais restent proches.
+    assert resultat.metriques["mape"] < 15
+    assert len(resultat.residus_test) == 30 and len(resultat.predictions_test) == 30
+
+
+def test_gradient_boosting_importances_des_variables_somme_un():
+    x, y = _jeu_lineaire()
+    resultat = entrainement.entrainer_et_evaluer(x, y, "gradient_boosting")
+    importances = resultat.coefficients
+    assert importances is not None and "Volume" in importances
+    assert sum(importances.values()) == pytest.approx(1.0)
+    assert importances["Volume"] == max(importances.values())  # la cible dépend du volume
+
+
+def test_gradient_boosting_hyperparametres_pris_en_compte():
+    x, y = _jeu_lineaire()
+    resultat = entrainement.entrainer_et_evaluer(
+        x,
+        y,
+        "gradient_boosting",
+        hyperparametres_gb={"n_estimators": 25, "learning_rate": 0.2, "max_depth": 2},
+    )
+    modele = resultat.pipeline.named_steps["boosting"]
+    assert modele.n_estimators == 25 and modele.learning_rate == 0.2 and modele.max_depth == 2
+
+
+def test_gradient_boosting_reproductible_a_graine_fixee():
+    x, y = _jeu_lineaire()
+    a = entrainement.entrainer_et_evaluer(x, y, "gradient_boosting")
+    b = entrainement.entrainer_et_evaluer(x, y, "gradient_boosting")
+    assert a.predictions_test == b.predictions_test
+
+
+def test_entrainer_methodes_renvoie_les_trois():
     x, y = _jeu_lineaire()
     resultats = entrainement.entrainer_methodes(x, y)
-    assert set(resultats) == {"regression_lineaire", "reseau_neurones"}
+    assert set(resultats) == {"regression_lineaire", "reseau_neurones", "gradient_boosting"}
+    assert set(entrainement.LIBELLES_METHODES) == set(entrainement.METHODES)
 
 
 def test_methode_inconnue_refusee():

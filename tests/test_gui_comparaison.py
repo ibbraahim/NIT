@@ -104,15 +104,15 @@ def test_comparer_le_realise_remplit_le_tableau(application):
     # Les rapprochements sont lus en direct (JOIN prévision/réel) : pas besoin d'avoir cliqué
     # sur « Lancer la comparaison » pour voir le graphique et les métriques.
     assert application.erreurs == []
-    assert len(vue._lignes_rl) == 1
-    assert vue._lignes_rl[0]["heures_prevues"] == pytest.approx(60.0)
-    assert vue._lignes_rl[0]["heures_reelles"] == pytest.approx(62.0)
-    assert vue._lignes_rl[0]["ecart_absolu"] == pytest.approx(2.0)
-    assert vue._lignes_rl[0]["dans_ic"] is True
-    assert vue._lignes_rn == []
+    assert len(vue._lignes["regression_lineaire"]) == 1
+    assert vue._lignes["regression_lineaire"][0]["heures_prevues"] == pytest.approx(60.0)
+    assert vue._lignes["regression_lineaire"][0]["heures_reelles"] == pytest.approx(62.0)
+    assert vue._lignes["regression_lineaire"][0]["ecart_absolu"] == pytest.approx(2.0)
+    assert vue._lignes["regression_lineaire"][0]["dans_ic"] is True
+    assert vue._lignes["reseau_neurones"] == []
     # Le tableau des métriques (MAE, RMSE, MAPE, Biais, Couverture IC, Taux de victoire) a
-    # bien été construit : une ligne d'en-tête et une ligne par métrique, 3 colonnes chacune.
-    assert len(vue.cadre_metriques.winfo_children()) == 3 * 7
+    # bien été construit : une ligne d'en-tête et une ligne par métrique, 4 colonnes chacune.
+    assert len(vue.cadre_metriques.winfo_children()) == 4 * 7
 
     # « Comparer le réalisé » persiste le résultat dans comparaisons_realise (UC20 : matière
     # première des KPI de précision et de la détection de dérive, UC21).
