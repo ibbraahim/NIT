@@ -359,9 +359,11 @@ class Planificateur:
         from app.taches.serveur import executer_nuit, executer_sous_verrou
 
         # Si le poste s'est endormi à l'heure prévue, la nuit part au réveil (dans les 3 h).
+        # Fuseau UTC explicite : sans lui, un CronTrigger prend l'heure du poste, alors que le
+        # choix des tâches du jour (dimanche, 1er du mois) se fait sur la date UTC.
         self._scheduler.add_job(
             lambda: executer_sous_verrou(executer_nuit),
-            CronTrigger(hour=0, minute=30),
+            CronTrigger(hour=0, minute=30, timezone="UTC"),
             id="nuit",
             replace_existing=True,
             coalesce=True,

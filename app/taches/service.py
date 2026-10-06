@@ -4,7 +4,7 @@ Démarré avec ``python -m app.taches planifier`` (ou ``scripts/demarrer_workly.
 Chaque nuit à 00:30 UTC, la tâche « nuit » enchaîne dans l'ordre : sauvegarde, import, comparaison,
 KPI, alertes, prévisions, rapport, puis les tâches périodiques du jour (capacités de la semaine le
 dimanche, mensuel le 1er, annuel le 1er janvier). L'hebdomadaire garde son jour et son heure
-réglables (UC07). Tout est écrit dans ``journal_taches``.
+réglables (UC07, heure du PC). Tout est écrit dans ``journal_taches``.
 
 Le point d'accès HTTP tourne dans le même processus, donc avec le même verrou : un appel de
 l'extérieur (route ``/bilan`` en lecture, ou une tâche à la demande) ne chevauche jamais la nuit.
@@ -16,10 +16,21 @@ onglet Tâches) : chaque tâche tournerait deux fois.
 from __future__ import annotations
 
 import threading
+from datetime import UTC, datetime
 
 from app.journal import journal
 
 _log = journal(__name__)
+
+
+def _libelle_heure(iso: str | None) -> str:
+    """« 07/10/2026 02:30 (heure du PC) = 00:30 UTC » à partir d'une date ISO."""
+    if not iso:
+        return "non planifiée"
+    moment = datetime.fromisoformat(iso)
+    local = moment.astimezone()
+    utc = moment.astimezone(UTC)
+    return f"{local:%d/%m/%Y %H:%M} (heure du PC) = {utc:%d/%m %H:%M} UTC"
 
 
 def lancer(hote: str = "127.0.0.1", port: int = 8765, avec_serveur: bool = True) -> None:
@@ -32,7 +43,7 @@ def lancer(hote: str = "127.0.0.1", port: int = 8765, avec_serveur: bool = True)
     planificateur = Planificateur(mode_chaine=True)
     planificateur.demarrer()
     for tache, prochaine in sorted(planificateur.prochaines_executions()):
-        print(f"Prochaine exécution de « {tache} » : {prochaine} (UTC)")
+        print(f"Prochaine exécution de « {tache} » : {_libelle_heure(prochaine)}")
     _log.info("Service de planification démarré (serveur HTTP : %s).", avec_serveur)
     try:
         if avec_serveur:

@@ -256,7 +256,7 @@ plateforme que la surveillance et l'analyse.
            previsions_quotidiennes → rapport_quotidien → tâches du jour
            (dimanche capacites_semaine, 1er du mois mensuel, 1er janvier annuel)
            arrêt à la première erreur ; l'échec est journalisé et notifié par e-mail
-hebdomadaire : garde son jour et son heure réglables (écran Administration, UC07)
+hebdomadaire : garde son jour et son heure réglables (écran Administration, UC07), heure du PC
 ```
 
 L'ordre ne dépend plus de décalages d'horloge : une tâche lente ne décale plus la suivante. Le

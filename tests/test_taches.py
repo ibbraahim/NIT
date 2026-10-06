@@ -120,3 +120,16 @@ def test_planificateur_mode_chaine_une_nuit_et_l_hebdomadaire(bd_vierge):
         assert all(prochaine is not None for prochaine in jobs.values())
     finally:
         planificateur.arreter()
+
+
+def test_planificateur_mode_chaine_la_nuit_part_a_0h30_utc(bd_vierge):
+    from datetime import UTC, datetime
+
+    planificateur = Planificateur(mode_chaine=True)
+    try:
+        planificateur.demarrer()
+        prochaine = dict(planificateur.prochaines_executions())["nuit"]
+        moment = datetime.fromisoformat(prochaine).astimezone(UTC)
+        assert (moment.hour, moment.minute) == (0, 30)
+    finally:
+        planificateur.arreter()
