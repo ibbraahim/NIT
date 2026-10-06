@@ -47,7 +47,9 @@ if ($SansNgrok) {
 } elseif (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
     Write-Host "ngrok est introuvable dans le PATH : lancez-le a la main (voir la documentation)." -ForegroundColor Red
 } else {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command",
+    # Même interpréteur que celui qui exécute ce script (powershell ou pwsh selon le poste)
+    $interpreteur = (Get-Process -Id $PID).Path
+    Start-Process $interpreteur -ArgumentList "-NoExit", "-Command",
         "ngrok http $Port --url https://$DomaineNgrok"
 }
 
