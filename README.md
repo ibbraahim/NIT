@@ -163,6 +163,8 @@ Exécution manuelle, sans passer par l'interface :
 python -m app.taches lister                    # tâches disponibles
 python -m app.taches executer <nom_tache>       # exécute et journalise le résultat
 python -m app.taches serveur                    # point d'accès HTTP (jeton WORKLY_TOKEN_TACHES)
+python -m app.taches planifier                  # service sans interface : nuit enchaînée dans
+                                                # l'ordre + point d'accès HTTP (GET /bilan)
 # Windows : scripts\configurer_alertes.ps1 (une fois), puis scripts\demarrer_workly.ps1
 # (serveur + ngrok) ; scripts\installer_demarrage_auto.ps1 le lance à l'ouverture de session
 ```

@@ -101,6 +101,7 @@ Tâches).
 | `GET /aujourdhui` | date UTC et drapeaux `est_dimanche`, `est_lundi`, `est_premier_du_mois`, `est_premier_janvier` (aiguillage par date) | 200, 401 |
 | `POST /alerte?etape=<nom>` | envoie l'e-mail « échec de l'étape <nom> » (le nom est nettoyé) | 200, 500 si l'e-mail n'est pas parti, 401 |
 | `POST /taches-du-jour` | lance dans l'ordre les tâches dues aujourd'hui (UTC) : dimanche `capacites_semaine`, lundi `hebdomadaire`, le 1er `mensuel`, le 1er janvier `annuel` ; arrêt à la première erreur | 200, 500, 401, 409 |
+| `GET /bilan` | état lu dans `journal_taches` (lecture seule) : `statut_global` (`succes`, `echec` si un échec dans les 24 h, `incomplet` si une étape de la nuit n'a pas réussi dans les 30 h), dernière exécution de chaque tâche, échecs des 7 derniers jours, tâches jamais exécutées | 200, 401 |
 | `POST /cycle-nocturne` | enchaîne import → comparaison → KPI → alertes → prévisions → rapport, s'arrête à la première erreur | 200 ou 500 avec `etape_en_echec` |
 
 Toutes les requêtes `POST` portent l'en-tête `Authorization: Bearer {{TOKEN_WORKLY}}`. Corps de
@@ -238,3 +239,38 @@ l'appel HTTP. Un fichier traité est déplacé dans `entrees/traites/`.
 | Notification | Email, Slack, Teams, Notify |
 | Variable / secret | Variables, Credentials, Secrets, Environment |
 | Attente (non utilisée ici) | Wait, Delay, Sleep |
+
+
+## Architecture « Workly planifie, la plateforme surveille »
+
+Au lieu de piloter chaque étape depuis la plateforme (9 appels, des Cron à resynchroniser, des
+connexions HTTP longues), on peut laisser Workly enchaîner sa nuit lui-même et ne garder côté
+plateforme que la surveillance et l'analyse.
+
+**Dans Workly (processus sans interface)** — `python -m app.taches planifier`
+(ou `scripts\demarrer_workly.ps1 -Planifier`, qui lance aussi ngrok) :
+
+```
+00:30 UTC  nuit : sauvegarde_base → import_historique → import_previsions_volume →
+           comparaison_quotidienne → kpi_quotidiens → alertes_capacite →
+           previsions_quotidiennes → rapport_quotidien → tâches du jour
+           (dimanche capacites_semaine, 1er du mois mensuel, 1er janvier annuel)
+           arrêt à la première erreur ; l'échec est journalisé et notifié par e-mail
+hebdomadaire : garde son jour et son heure réglables (écran Administration, UC07)
+```
+
+L'ordre ne dépend plus de décalages d'horloge : une tâche lente ne décale plus la suivante. Le
+point d'accès HTTP tourne dans le même processus (même verrou) ; `--sans-serveur` lance le
+planificateur seul. Si le poste s'endort à 00:30, la nuit part au réveil (dans les 3 h).
+
+**Dans la plateforme (Fusion ou n8n)** — un seul workflow de surveillance, un peu après la nuit :
+
+```
+Cron → GET /bilan ── erreur réseau ──► message « Workly injoignable »
+        └─► analyse du bilan (agents) → e-mail / Teams
+```
+
+**À ne pas faire en même temps :** ce mode et les Cron par étape de la plateforme (P1 à P9), ou
+le planificateur de l'interface graphique (Administration → Tâches → Démarrer) : chaque tâche
+tournerait deux fois. Le PC doit rester allumé, mais si la nuit échoue ou n'a pas eu lieu,
+`/bilan` le signale (`echec` ou `incomplet`).

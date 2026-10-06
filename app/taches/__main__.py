@@ -6,6 +6,9 @@ Utilisation :
     python -m app.taches executer <nom_tache>     exécute une tâche et journalise le résultat
     python -m app.taches serveur                  point d'accès HTTP pour une plateforme
                                                   d'automatisation (jeton WORKLY_TOKEN_TACHES)
+    python -m app.taches planifier                service sans interface : planificateur avec la
+                                                  nuit enchaînée dans l'ordre + point d'accès HTTP
+                                                  (--sans-serveur pour le planificateur seul)
 """
 
 from __future__ import annotations
@@ -30,6 +33,14 @@ def principal(arguments: list[str] | None = None) -> int:
     serveur = sous_analyseurs.add_parser("serveur", help="démarre le point d'accès HTTP")
     serveur.add_argument("--hote", default="127.0.0.1", help="adresse d'écoute (défaut : locale)")
     serveur.add_argument("--port", type=int, default=8765, help="port d'écoute (défaut : 8765)")
+    planifier = sous_analyseurs.add_parser(
+        "planifier", help="service sans interface : planificateur + point d'accès HTTP"
+    )
+    planifier.add_argument("--hote", default="127.0.0.1", help="adresse d'écoute (défaut : locale)")
+    planifier.add_argument("--port", type=int, default=8765, help="port d'écoute (défaut : 8765)")
+    planifier.add_argument(
+        "--sans-serveur", action="store_true", help="planificateur seul, sans point d'accès HTTP"
+    )
     options = analyseur.parse_args(arguments)
 
     configurer_journal()
@@ -41,6 +52,11 @@ def principal(arguments: list[str] | None = None) -> int:
             from app.taches.serveur import servir
 
             servir(options.hote, options.port)
+            return 0
+        if options.commande == "planifier":
+            from app.taches.service import lancer
+
+            lancer(options.hote, options.port, avec_serveur=not options.sans_serveur)
             return 0
         if options.commande in (None, "lister"):
             print("Tâches disponibles :")

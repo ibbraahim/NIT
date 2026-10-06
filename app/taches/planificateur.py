@@ -344,9 +344,41 @@ class Planificateur:
     """Enveloppe autour d'APScheduler : les tâches sont programmées à la construction, mais
     ne s'exécutent qu'une fois le planificateur démarré."""
 
-    def __init__(self) -> None:
+    def __init__(self, mode_chaine: bool = False) -> None:
+        """``mode_chaine`` : une seule tâche « nuit » à 00:30 UTC enchaîne sauvegarde, cycle
+        nocturne et tâches périodiques dans l'ordre, au lieu d'horaires décalés (service sans
+        interface, ``python -m app.taches planifier``). L'hebdomadaire garde son horaire
+        réglable."""
         self._scheduler = BackgroundScheduler(timezone="UTC")
-        self._programmer()
+        if mode_chaine:
+            self._programmer_chaine()
+        else:
+            self._programmer()
+
+    def _programmer_chaine(self) -> None:
+        from app.taches.serveur import executer_nuit, executer_sous_verrou
+
+        # Si le poste s'est endormi à l'heure prévue, la nuit part au réveil (dans les 3 h).
+        self._scheduler.add_job(
+            lambda: executer_sous_verrou(executer_nuit),
+            CronTrigger(hour=0, minute=30),
+            id="nuit",
+            replace_existing=True,
+            coalesce=True,
+            misfire_grace_time=3 * 3600,
+        )
+        config = _configuration_modeles()
+        jour = JOURS_CRON.get(config["jour_reentrainement"], "mon")
+        heure_str, _, minute_str = config["heure_reentrainement"].partition(":")
+        heure, minute = int(heure_str or 3), int(minute_str or 0)
+        self._scheduler.add_job(
+            lambda: executer_sous_verrou(lambda: executer_tache("hebdomadaire")),
+            CronTrigger(day_of_week=jour, hour=heure, minute=minute),
+            id="hebdomadaire",
+            replace_existing=True,
+            coalesce=True,
+            misfire_grace_time=3 * 3600,
+        )
 
     def _programmer(self) -> None:
         self._scheduler.add_job(

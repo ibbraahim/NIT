@@ -11,6 +11,9 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
     GET  /sante               {"ok": true}                          (sans jeton)
     GET  /taches              liste des tâches
     POST /taches/<nom>        exécute une tâche
+    GET  /bilan               état des automatisations lu dans le journal : dernière exécution de
+                              chaque tâche, échecs récents, nuit complète ou non (pour un
+                              workflow de surveillance qui n'appelle que cette route)
     GET  /aujourdhui          date du jour (UTC) et drapeaux : dimanche, lundi, 1er du mois, 1er
                               janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
@@ -128,6 +131,86 @@ def executer_et_mesurer(nom: str) -> dict:
     }
 
 
+def taches_dues_nuit(maintenant: datetime | None = None) -> list[str]:
+    """Tâches périodiques de la nuit quand l'hebdomadaire a son propre horaire (jour et heure
+    réglables dans les paramètres) : mêmes tâches que ``taches_dues``, sans l'hebdomadaire."""
+    return [nom for nom in taches_dues(maintenant) if nom != "hebdomadaire"]
+
+
+def executer_nuit(maintenant: datetime | None = None) -> dict:
+    """La nuit entière, dans l'ordre et sans dépendre de l'horloge : sauvegarde, cycle
+    nocturne (import → comparaison → KPI → alertes → prévisions → rapport), puis les tâches
+    périodiques du jour. S'arrête à la première erreur (l'échec est déjà journalisé et notifié
+    par ``executer_tache``)."""
+    etapes = []
+    for nom in ("sauvegarde_base", *CYCLE_NOCTURNE, *taches_dues_nuit(maintenant)):
+        resultat = executer_et_mesurer(nom)
+        etapes.append(resultat)
+        if resultat["statut"] != "succes":
+            return {"statut": "echec", "etape_en_echec": nom, "etapes": etapes}
+    return {"statut": "succes", "etapes": etapes}
+
+
+def executer_sous_verrou(travail):
+    """Pour le planificateur interne : attend son tour au lieu de refuser (une route HTTP, elle,
+    répond 409), de sorte que deux traitements ne tournent jamais en même temps."""
+    with _verrou:
+        return travail()
+
+
+def _ligne_bilan(ligne: dict) -> dict:
+    duree = (ligne["fin"] - ligne["debut"]).total_seconds() if ligne["fin"] else None
+    return {
+        "tache": ligne["tache"],
+        "debut": ligne["debut"].isoformat(),
+        "fin": ligne["fin"].isoformat() if ligne["fin"] else None,
+        "statut": ligne["statut"],
+        "duree_s": round(duree, 2) if duree is not None else None,
+        "message": ligne["message"][:300],
+    }
+
+
+def bilan(jours: int = 7, heures_nuit: int = 30) -> dict:
+    """État des automatisations, lu dans ``journal_taches`` (lecture seule).
+
+    ``statut_global`` : ``echec`` si une tâche a échoué dans les dernières 24 h ;
+    ``incomplet`` si une étape de la nuit (sauvegarde + cycle nocturne) n'a pas réussi dans les
+    ``heures_nuit`` dernières heures (PC éteint, planificateur arrêté…) ; sinon ``succes``."""
+    from app.bd.connexion import transaction
+    from app.bd.depots.taches import DepotTaches
+    from app.taches.planificateur import TACHES
+
+    maintenant = datetime.now(UTC)
+    with transaction() as cur:
+        depot = DepotTaches(cur)
+        dernieres = depot.dernieres_executions()
+        echecs = depot.echecs_depuis(jours)
+        reussies = set(depot.succes_depuis(heures_nuit))
+    echecs_24h = [e for e in echecs if (maintenant - e["debut"]).total_seconds() <= 24 * 3600]
+    attendues = ("sauvegarde_base", *CYCLE_NOCTURNE)
+    manquantes = [nom for nom in attendues if nom not in reussies]
+    if echecs_24h:
+        statut = "echec"
+    elif manquantes:
+        statut = "incomplet"
+    else:
+        statut = "succes"
+    ordre = {nom: i for i, nom in enumerate(attendues)}
+    return {
+        "date": maintenant.isoformat(),
+        "statut_global": statut,
+        "nb_echecs_24h": len(echecs_24h),
+        "etapes_nuit_manquantes": manquantes,
+        "jamais_executees": sorted(set(TACHES) - {d["tache"] for d in dernieres}),
+        "dernieres_executions": [
+            _ligne_bilan(d)
+            for d in sorted(dernieres, key=lambda d: (ordre.get(d["tache"], 99), d["tache"]))
+        ],
+        "echecs_recents": [_ligne_bilan(e) for e in echecs],
+        "periode_echecs_jours": jours,
+    }
+
+
 def executer_cycle() -> dict:
     """Enchaîne les tâches du cycle nocturne ; s'arrête à la première qui échoue."""
     etapes = []
@@ -178,6 +261,9 @@ def fabriquer_gestionnaire(jeton: str):
                 return
             if self.path == "/aujourdhui":
                 self._repondre(200, aujourdhui())
+                return
+            if self.path == "/bilan":
+                self._repondre(200, bilan())
                 return
             if self.path == "/taches":
                 from app.taches.planificateur import TACHES
@@ -249,14 +335,20 @@ def fabriquer_gestionnaire(jeton: str):
     return Gestionnaire
 
 
-def servir(hote: str = "127.0.0.1", port: int = 8765) -> None:
-    """Démarre le serveur (bloquant) ; refuse de démarrer sans jeton suffisamment long."""
+def lire_jeton() -> str:
+    """Jeton de l'environnement ; quitte avec un message clair s'il est absent ou trop court."""
     jeton = os.environ.get(VARIABLE_JETON, "")
     if len(jeton) < LONGUEUR_MIN_JETON:
         raise SystemExit(
             f"Erreur : définissez la variable d'environnement {VARIABLE_JETON} "
             f"({LONGUEUR_MIN_JETON} caractères au minimum) avant de démarrer le serveur."
         )
+    return jeton
+
+
+def servir(hote: str = "127.0.0.1", port: int = 8765) -> None:
+    """Démarre le serveur (bloquant) ; refuse de démarrer sans jeton suffisamment long."""
+    jeton = lire_jeton()
     serveur = ThreadingHTTPServer((hote, port), fabriquer_gestionnaire(jeton))
     _log.info("Serveur des tâches à l'écoute sur http://%s:%s", hote, port)
     print(f"Serveur des tâches à l'écoute sur http://{hote}:{port} (Ctrl+C pour arrêter)")

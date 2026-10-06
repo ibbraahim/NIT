@@ -109,3 +109,14 @@ def test_import_previsions_volume_traite_les_fichiers_deposes(
     message = executer_tache("import_previsions_volume")
     assert "1 fichier(s) illisible(s)" in message
     assert (depot / "illisible.csv").exists()
+
+
+def test_planificateur_mode_chaine_une_nuit_et_l_hebdomadaire(bd_vierge):
+    planificateur = Planificateur(mode_chaine=True)
+    try:
+        planificateur.demarrer()
+        jobs = dict(planificateur.prochaines_executions())
+        assert set(jobs) == {"nuit", "hebdomadaire"}
+        assert all(prochaine is not None for prochaine in jobs.values())
+    finally:
+        planificateur.arreter()

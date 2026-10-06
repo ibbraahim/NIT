@@ -32,3 +32,28 @@ class DepotTaches(Depot):
                 ORDER BY debut DESC LIMIT 1""",
             (tache,),
         )
+
+    def dernieres_executions(self) -> list[dict]:
+        """Dernière exécution de chaque tâche (une ligne par tâche)."""
+        return self._tous(
+            f"""SELECT DISTINCT ON (tache) {COLONNES} FROM journal_taches
+                ORDER BY tache, debut DESC"""
+        )
+
+    def echecs_depuis(self, jours: int, limite: int = 50) -> list[dict]:
+        """Exécutions en échec des ``jours`` derniers jours, de la plus récente à la plus ancienne."""
+        return self._tous(
+            f"""SELECT {COLONNES} FROM journal_taches
+                WHERE statut = 'echec' AND debut >= now() - make_interval(days => %s)
+                ORDER BY debut DESC LIMIT %s""",
+            (jours, limite),
+        )
+
+    def succes_depuis(self, heures: int) -> list[str]:
+        """Noms des tâches réussies pendant les ``heures`` dernières heures."""
+        lignes = self._tous(
+            """SELECT DISTINCT tache FROM journal_taches
+               WHERE statut = 'succes' AND debut >= now() - make_interval(hours => %s)""",
+            (heures,),
+        )
+        return [ligne["tache"] for ligne in lignes]

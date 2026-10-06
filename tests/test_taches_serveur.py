@@ -236,3 +236,75 @@ def test_taches_du_jour_sans_tache_due_reussit(adresse, monkeypatch):
     code, corps = appeler(adresse, "/taches-du-jour", "POST")
     assert code == 200 and corps == {"statut": "succes", "taches_dues": [], "etapes": []}
     assert appeler(adresse, "/taches-du-jour", "POST", jeton=None)[0] == 401
+
+
+def test_nuit_enchaine_dans_l_ordre_et_s_arrete_a_la_premiere_erreur(monkeypatch):
+    from datetime import UTC, datetime
+
+    appelees = []
+
+    def faux(nom):
+        appelees.append(nom)
+        return {"tache": nom, "statut": "echec" if nom == "alertes_capacite" else "succes"}
+
+    monkeypatch.setattr(serveur, "executer_et_mesurer", faux)
+    resultat = serveur.executer_nuit(datetime(2026, 10, 4, 0, 30, tzinfo=UTC))
+    assert resultat["statut"] == "echec" and resultat["etape_en_echec"] == "alertes_capacite"
+    assert appelees == [
+        "sauvegarde_base",
+        "import_historique",
+        "import_previsions_volume",
+        "comparaison_quotidienne",
+        "kpi_quotidiens",
+        "alertes_capacite",
+    ]
+
+
+def test_nuit_complete_ajoute_les_taches_du_jour_sans_l_hebdomadaire(monkeypatch):
+    from datetime import UTC, datetime
+
+    appelees = []
+    monkeypatch.setattr(
+        serveur,
+        "executer_et_mesurer",
+        lambda nom: appelees.append(nom) or {"tache": nom, "statut": "succes"},
+    )
+    # Lundi 1er juin 2026 : l'hebdomadaire a son propre horaire, seul le mensuel s'ajoute.
+    resultat = serveur.executer_nuit(datetime(2026, 6, 1, 0, 30, tzinfo=UTC))
+    assert resultat["statut"] == "succes"
+    assert appelees[0] == "sauvegarde_base" and appelees[-2:] == ["rapport_quotidien", "mensuel"]
+    assert "hebdomadaire" not in appelees
+
+
+def test_bilan_exige_le_jeton(adresse):
+    assert appeler(adresse, "/bilan", jeton=None)[0] == 401
+
+
+def test_bilan_base_vierge_signale_une_nuit_incomplete(adresse, bd_vierge):
+    code, corps = appeler(adresse, "/bilan")
+    assert code == 200
+    assert corps["statut_global"] == "incomplet"
+    assert corps["etapes_nuit_manquantes"][0] == "sauvegarde_base"
+    assert corps["dernieres_executions"] == [] and corps["echecs_recents"] == []
+    assert len(corps["jamais_executees"]) == 12
+
+
+def test_bilan_apres_une_nuit_reussie_puis_un_echec(adresse, bd_vierge):
+    from app.bd.connexion import transaction
+    from app.bd.depots.taches import DepotTaches
+
+    with transaction() as cur:
+        depot = DepotTaches(cur)
+        for nom in ("sauvegarde_base", *serveur.CYCLE_NOCTURNE):
+            depot.terminer(depot.demarrer(nom), "succes", f"{nom} ok")
+    code, corps = appeler(adresse, "/bilan")
+    assert corps["statut_global"] == "succes" and corps["etapes_nuit_manquantes"] == []
+    assert [d["tache"] for d in corps["dernieres_executions"]][0] == "sauvegarde_base"
+
+    with transaction() as cur:
+        depot = DepotTaches(cur)
+        depot.terminer(depot.demarrer("kpi_quotidiens"), "echec", "x" * 500)
+    code, corps = appeler(adresse, "/bilan")
+    assert corps["statut_global"] == "echec" and corps["nb_echecs_24h"] == 1
+    echec = corps["echecs_recents"][0]
+    assert echec["tache"] == "kpi_quotidiens" and len(echec["message"]) == 300

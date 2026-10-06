@@ -3,11 +3,15 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\demarrer_workly.ps1
 #
 # Option -SansNgrok : ne lance que le serveur (ngrok déjà ouvert dans un autre terminal).
+# Option -Planifier : démarre en plus le planificateur sans interface (nuit enchaînée dans
+# l'ordre : sauvegarde -> import -> ... -> rapport). À utiliser à la place des Cron d'un
+# orchestrateur qui lancerait les mêmes tâches, sinon elles tournent deux fois.
 # Le jeton est lu dans un fichier (jamais écrit dans ce script). Les réglages d'alerte e-mail
 # viennent de scripts\configurer_alertes.ps1. Arrêt : Ctrl+C dans cette fenêtre, puis fermer la
 # fenêtre ngrok.
 param(
     [switch]$SansNgrok,
+    [switch]$Planifier,
     [string]$FichierJeton = "$HOME\Desktop\jeton-workly.txt",
     [string]$DomaineNgrok = "condone-dragonfly-coveting.ngrok-free.dev",
     [int]$Port = 8765
@@ -53,4 +57,8 @@ if ($SansNgrok) {
         "ngrok http $Port --url https://$DomaineNgrok"
 }
 
-python -m app.taches serveur --port $Port
+if ($Planifier) {
+    python -m app.taches planifier --port $Port
+} else {
+    python -m app.taches serveur --port $Port
+}
