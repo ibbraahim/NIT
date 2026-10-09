@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" id="Definitions_S1" targetNamespace="http://workly.local/bpmn" exporter="Workly" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_S1">
+    <bpmn:participant id="Pool_S1" name="Workly · 1/2" processRef="Process_S1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_S1" name="Workflow Workly 1/2" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="lane_admin" name="Administrateur">
+        <bpmn:flowNodeRef>debut</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ref</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_planif" name="Planificateur">
+        <bpmn:flowNodeRef>demande</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_qual</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>proposer</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_resp" name="Responsable">
+        <bpmn:flowNodeRef>examiner</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_plan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>valider</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_direction" name="Direction">
+      </bpmn:lane>
+      <bpmn:lane id="lane_systeme" name="Système">
+        <bpmn:flowNodeRef>t_nuit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>nuit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>fin1</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="debut" name="Mise en service">
+      <bpmn:documentation>Installation faite, base PostgreSQL créée.</bpmn:documentation>
+      <bpmn:outgoing>Flow_1_0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="ref" name="Paramétrer référentiels et modèles">
+      <bpmn:documentation>UC02, UC03, UC07, UC08 à UC10 — écrans Administration et Modèles.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_0</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_1</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="demande" name="Saisir ou importer la demande">
+      <bpmn:documentation>UC05 — écran Données (saisie ou fichier CSV/Excel).</bpmn:documentation>
+      <bpmn:incoming>Flow_1_1</bpmn:incoming>
+      <bpmn:incoming>Flow_1_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_qual" name="Qualité&#10;OK ?">
+      <bpmn:documentation>UC06 — contrôle automatique de la qualité des données.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_3</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1_4</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="t_nuit" name="Chaque nuit&#10;00:30 UTC">
+      <bpmn:documentation>Planificateur de tâches de Workly.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_5</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_t_nuit" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="nuit" name="Exécuter les 8 étapes de la nuit">
+      <bpmn:documentation>Sauvegarde, imports, comparaison, KPI, alertes, prévisions, rapport quotidien.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="proposer" name="Proposer et soumettre le plan">
+      <bpmn:documentation>UC11 à UC14 — consulter les prévisions, proposer, ajuster, soumettre.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_6</bpmn:incoming>
+      <bpmn:incoming>Flow_1_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_7</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="examiner" name="Examiner le plan soumis">
+      <bpmn:documentation>Écran Plan de charge (rôle responsable).</bpmn:documentation>
+      <bpmn:incoming>Flow_1_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_plan" name="Plan accepté ?">
+      <bpmn:documentation>Décision du responsable.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="valider" name="Valider le plan">
+      <bpmn:documentation>UC14 — le plan validé devient la référence.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_1_11</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="fin1" name="Plan validé">
+      <bpmn:documentation>Suite : alertes, suivi et rapports.</bpmn:documentation>
+      <bpmn:incoming>Flow_1_11</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1_0" sourceRef="debut" targetRef="ref" />
+    <bpmn:sequenceFlow id="Flow_1_1" sourceRef="ref" targetRef="demande" />
+    <bpmn:sequenceFlow id="Flow_1_2" sourceRef="demande" targetRef="g_qual" />
+    <bpmn:sequenceFlow id="Flow_1_3" name="Non" sourceRef="g_qual" targetRef="demande" />
+    <bpmn:sequenceFlow id="Flow_1_4" name="Oui" sourceRef="g_qual" targetRef="t_nuit" />
+    <bpmn:sequenceFlow id="Flow_1_5" sourceRef="t_nuit" targetRef="nuit" />
+    <bpmn:sequenceFlow id="Flow_1_6" sourceRef="nuit" targetRef="proposer" />
+    <bpmn:sequenceFlow id="Flow_1_7" sourceRef="proposer" targetRef="examiner" />
+    <bpmn:sequenceFlow id="Flow_1_8" sourceRef="examiner" targetRef="g_plan" />
+    <bpmn:sequenceFlow id="Flow_1_9" name="Non" sourceRef="g_plan" targetRef="proposer" />
+    <bpmn:sequenceFlow id="Flow_1_10" name="Oui" sourceRef="g_plan" targetRef="valider" />
+    <bpmn:sequenceFlow id="Flow_1_11" sourceRef="valider" targetRef="fin1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_S1">
+    <bpmndi:BPMNPlane id="Plane_S1" bpmnElement="Collab_S1">
+      <bpmndi:BPMNShape id="Pool_S1_di" bpmnElement="Pool_S1" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#FFFFFF"><dc:Bounds x="0" y="0" width="1224" height="460" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_admin_di" bpmnElement="lane_admin" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#FFFFFF"><dc:Bounds x="30" y="0" width="1194" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_planif_di" bpmnElement="lane_planif" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#FFFFFF"><dc:Bounds x="30" y="92" width="1194" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_resp_di" bpmnElement="lane_resp" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#FFFFFF"><dc:Bounds x="30" y="184" width="1194" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_direction_di" bpmnElement="lane_direction" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#FFFFFF"><dc:Bounds x="30" y="276" width="1194" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_systeme_di" bpmnElement="lane_systeme" isHorizontal="true" bioc:stroke="#B8C0D6" bioc:fill="#EEF8F5"><dc:Bounds x="30" y="368" width="1194" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="debut_di" bpmnElement="debut" bioc:stroke="#1B2A4A" bioc:fill="#FFFFFF"><dc:Bounds x="110" y="32" width="28" height="28" /><bpmndi:BPMNLabel><dc:Bounds x="74" y="63" width="100" height="15" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ref_di" bpmnElement="ref" bioc:stroke="#6B3FA0" bioc:fill="#E2D9F3"><dc:Bounds x="184" y="19" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="demande_di" bpmnElement="demande" bioc:stroke="#6B3FA0" bioc:fill="#E2D9F3"><dc:Bounds x="288" y="111" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_qual_di" bpmnElement="g_qual" isMarkerVisible="true" bioc:stroke="#2F7FC4" bioc:fill="#E3F0FC"><dc:Bounds x="418" y="120" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="456" y="123" width="90" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nuit_di" bpmnElement="t_nuit" bioc:stroke="#2E9C87" bioc:fill="#FFFFFF"><dc:Bounds x="526" y="400" width="28" height="28" /><bpmndi:BPMNLabel><dc:Bounds x="490" y="367" width="100" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="nuit_di" bpmnElement="nuit" bioc:stroke="#2E9C87" bioc:fill="#CDEEE8"><dc:Bounds x="600" y="387" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="proposer_di" bpmnElement="proposer" bioc:stroke="#6B3FA0" bioc:fill="#E2D9F3"><dc:Bounds x="704" y="111" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="examiner_di" bpmnElement="examiner" bioc:stroke="#6B3FA0" bioc:fill="#E2D9F3"><dc:Bounds x="808" y="203" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g_plan_di" bpmnElement="g_plan" isMarkerVisible="true" bioc:stroke="#2F7FC4" bioc:fill="#E3F0FC"><dc:Bounds x="938" y="212" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="901" y="251" width="110" height="15" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="valider_di" bpmnElement="valider" bioc:stroke="#6B3FA0" bioc:fill="#E2D9F3"><dc:Bounds x="1016" y="203" width="88" height="54" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fin1_di" bpmnElement="fin1" bioc:stroke="#1B2A4A" bioc:fill="#FFFFFF"><dc:Bounds x="1150" y="400" width="28" height="28" /><bpmndi:BPMNLabel><dc:Bounds x="1114" y="431" width="100" height="15" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_0_di" bpmnElement="Flow_1_0">
+        <di:waypoint x="138" y="46" />
+        <di:waypoint x="184" y="46" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_1_di" bpmnElement="Flow_1_1">
+        <di:waypoint x="228" y="73" />
+        <di:waypoint x="228" y="138" />
+        <di:waypoint x="288" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_2_di" bpmnElement="Flow_1_2">
+        <di:waypoint x="376" y="138" />
+        <di:waypoint x="418" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_3_di" bpmnElement="Flow_1_3">
+        <di:waypoint x="436" y="120" />
+        <di:waypoint x="436" y="101" />
+        <di:waypoint x="332" y="101" />
+        <di:waypoint x="332" y="111" />
+        <bpmndi:BPMNLabel><dc:Bounds x="441" y="102" width="28" height="15" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_4_di" bpmnElement="Flow_1_4">
+        <di:waypoint x="436" y="156" />
+        <di:waypoint x="436" y="414" />
+        <di:waypoint x="526" y="414" />
+        <bpmndi:BPMNLabel><dc:Bounds x="441" y="160" width="28" height="15" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_5_di" bpmnElement="Flow_1_5">
+        <di:waypoint x="554" y="414" />
+        <di:waypoint x="600" y="414" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_6_di" bpmnElement="Flow_1_6">
+        <di:waypoint x="644" y="387" />
+        <di:waypoint x="644" y="138" />
+        <di:waypoint x="704" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_7_di" bpmnElement="Flow_1_7">
+        <di:waypoint x="748" y="165" />
+        <di:waypoint x="748" y="230" />
+        <di:waypoint x="808" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_8_di" bpmnElement="Flow_1_8">
+        <di:waypoint x="896" y="230" />
+        <di:waypoint x="938" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_9_di" bpmnElement="Flow_1_9">
+        <di:waypoint x="956" y="212" />
+        <di:waypoint x="956" y="101" />
+        <di:waypoint x="748" y="101" />
+        <di:waypoint x="748" y="111" />
+        <bpmndi:BPMNLabel><dc:Bounds x="961" y="194" width="28" height="15" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_10_di" bpmnElement="Flow_1_10">
+        <di:waypoint x="974" y="230" />
+        <di:waypoint x="1016" y="230" />
+        <bpmndi:BPMNLabel><dc:Bounds x="980" y="212" width="28" height="15" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1_11_di" bpmnElement="Flow_1_11">
+        <di:waypoint x="1060" y="257" />
+        <di:waypoint x="1060" y="414" />
+        <di:waypoint x="1150" y="414" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
