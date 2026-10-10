@@ -308,3 +308,20 @@ def test_bilan_apres_une_nuit_reussie_puis_un_echec(adresse, bd_vierge):
     assert corps["statut_global"] == "echec" and corps["nb_echecs_24h"] == 1
     echec = corps["echecs_recents"][0]
     assert echec["tache"] == "kpi_quotidiens" and len(echec["message"]) == 300
+
+
+def test_route_connaissances(adresse):
+    assert appeler(adresse, "/connaissances?question=x", jeton=None)[0] == 401
+    assert appeler(adresse, "/connaissances")[0] == 400
+    code, corps = appeler(adresse, "/connaissances?question=erreur+401+jeton&k=2")
+    assert code == 200
+    assert corps["passages"][0]["section"].startswith("Erreur HTTP 401")
+    assert len(corps["passages"]) <= 2
+
+
+def test_bilan_avec_connaissances(adresse, bd_vierge):
+    code, corps = appeler(adresse, "/bilan?connaissances=1")
+    assert code == 200
+    assert corps["statut_global"] == "incomplet"
+    assert corps["connaissances"], "une nuit incomplète doit ramener des passages"
+    assert "connaissances" not in appeler(adresse, "/bilan")[1]

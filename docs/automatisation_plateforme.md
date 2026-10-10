@@ -274,3 +274,18 @@ Cron → GET /bilan ── erreur réseau ──► message « Workly injoignabl
 le planificateur de l'interface graphique (Administration → Tâches → Démarrer) : chaque tâche
 tournerait deux fois. Le PC doit rester allumé, mais si la nuit échoue ou n'a pas eu lieu,
 `/bilan` le signale (`echec` ou `incomplet`).
+
+## Outil RAG : base de connaissances d'exploitation
+
+Les agents d'analyse peuvent s'appuyer sur une base de connaissances plutôt que d'inventer des
+causes de panne. Elle est dans `docs/base_connaissances_exploitation.md` (une section par tâche,
+par statut et par erreur connue). Workly la découpe par section et classe les passages avec BM25
+(`app/taches/connaissances.py`, bibliothèque standard seulement).
+
+- `GET /connaissances?question=<texte>&k=3` : les passages les plus proches de la question.
+- `GET /bilan?connaissances=1` : le bilan habituel, plus un champ `connaissances` avec les
+  passages utiles aux pannes du bilan (liste vide quand la nuit est réussie).
+
+Dans le flux Agentic AI, l'unique changement est l'URL du composant « API Request » (ajouter
+`?connaissances=1`) et une phrase dans les instructions de l'Analyste : s'appuyer sur le champ
+`connaissances`, citer la section utilisée, écrire « cause inconnue dans la base » sinon.

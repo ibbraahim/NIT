@@ -14,6 +14,10 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
     GET  /bilan               état des automatisations lu dans le journal : dernière exécution de
                               chaque tâche, échecs récents, nuit complète ou non (pour un
                               workflow de surveillance qui n'appelle que cette route)
+    GET  /connaissances?question=...&k=3
+                              outil RAG : passages de la base de connaissances d'exploitation
+                              (docs/base_connaissances_exploitation.md) les plus proches
+    GET  /bilan?connaissances=1  le bilan, plus les passages utiles à ses pannes
     GET  /aujourdhui          date du jour (UTC) et drapeaux : dimanche, lundi, 1er du mois, 1er
                               janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
@@ -222,6 +226,33 @@ def executer_cycle() -> dict:
     return {"statut": "succes", "etapes": etapes}
 
 
+def _connaissances_du_bilan(resultat: dict) -> dict:
+    """Passages de la base de connaissances utiles aux pannes du bilan (outil RAG)."""
+    from app.taches.connaissances import ErreurConnaissances, connaissances_pour_bilan
+
+    try:
+        return {"connaissances": connaissances_pour_bilan(resultat)}
+    except ErreurConnaissances as exc:
+        return {"connaissances": [], "connaissances_erreur": str(exc)}
+
+
+def _chercher_connaissances(requete: dict) -> tuple[int, dict]:
+    """Réponse de ``GET /connaissances?question=...&k=3``."""
+    from app.taches.connaissances import ErreurConnaissances, rechercher
+
+    question = requete.get("question", [""])[0].strip()
+    if not question:
+        return 400, {"erreur": "Paramètre « question » manquant."}
+    try:
+        k = int(requete.get("k", ["3"])[0])
+    except ValueError:
+        return 400, {"erreur": "Paramètre « k » invalide."}
+    try:
+        return 200, {"question": question, "passages": rechercher(question, k)}
+    except ErreurConnaissances as exc:
+        return 500, {"erreur": str(exc)}
+
+
 def fabriquer_gestionnaire(jeton: str):
     class Gestionnaire(BaseHTTPRequestHandler):
         server_version = "WorklyTaches/1.0"
@@ -259,13 +290,21 @@ def fabriquer_gestionnaire(jeton: str):
             if not self._autorise():
                 self._repondre(401, {"erreur": "Jeton manquant ou invalide."})
                 return
-            if self.path == "/aujourdhui":
+            adresse = urlsplit(self.path)
+            requete = parse_qs(adresse.query)
+            if adresse.path == "/aujourdhui":
                 self._repondre(200, aujourdhui())
                 return
-            if self.path == "/bilan":
-                self._repondre(200, bilan())
+            if adresse.path == "/bilan":
+                resultat = bilan()
+                if requete.get("connaissances", ["0"])[0] in ("1", "oui", "true"):
+                    resultat.update(_connaissances_du_bilan(resultat))
+                self._repondre(200, resultat)
                 return
-            if self.path == "/taches":
+            if adresse.path == "/connaissances":
+                self._repondre(*_chercher_connaissances(requete))
+                return
+            if adresse.path == "/taches":
                 from app.taches.planificateur import TACHES
 
                 self._repondre(200, {"taches": sorted(TACHES), "cycle_nocturne": CYCLE_NOCTURNE})
