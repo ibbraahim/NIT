@@ -18,6 +18,7 @@ Routes (le jeton se passe en ``Authorization: Bearer <jeton>``) :
                               outil RAG : passages de la base de connaissances d'exploitation
                               (docs/base_connaissances_exploitation.md) les plus proches
     GET  /bilan?connaissances=1  le bilan, plus les passages utiles à ses pannes
+    GET  /bilan?simuler=echec|incomplet   bilan fictif (simulation: true), pour tester les agents
     GET  /aujourdhui          date du jour (UTC) et drapeaux : dimanche, lundi, 1er du mois, 1er
                               janvier (aiguillage d'un workflow selon la date)
     POST /test-mail           envoie un e-mail de test (voir app/taches/notifications.py)
@@ -215,6 +216,50 @@ def bilan(jours: int = 7, heures_nuit: int = 30) -> dict:
     }
 
 
+def bilan_simule(mode: str) -> dict:
+    """Bilan fictif pour tester les agents sans attendre une vraie panne (``GET /bilan?simuler=``).
+
+    ``echec`` : la sauvegarde échoue (message réel de ``trouver_pg_dump``) ; ``incomplet`` : la nuit
+    n'a pas tourné (PC éteint). Rien n'est lu ni écrit dans la base ; le champ ``simulation``
+    vaut ``true`` pour qu'aucun lecteur ne prenne ce bilan pour un vrai."""
+    maintenant = datetime.now(UTC)
+    base = {
+        "date": maintenant.isoformat(),
+        "simulation": True,
+        "jamais_executees": ["annuel", "capacites_semaine", "hebdomadaire", "mensuel"],
+        "dernieres_executions": [],
+        "periode_echecs_jours": 7,
+    }
+    if mode == "echec":
+        return {
+            **base,
+            "statut_global": "echec",
+            "nb_echecs_24h": 1,
+            "etapes_nuit_manquantes": ["sauvegarde_base"],
+            "echecs_recents": [
+                {
+                    "tache": "sauvegarde_base",
+                    "debut": maintenant.isoformat(),
+                    "fin": maintenant.isoformat(),
+                    "statut": "echec",
+                    "duree_s": 0.02,
+                    "message": "pg_dump est introuvable. Installez les outils PostgreSQL ou "
+                    "renseignez la variable d'environnement WORKLY_PG_DUMP avec le chemin "
+                    "complet de pg_dump.",
+                }
+            ],
+        }
+    if mode == "incomplet":
+        return {
+            **base,
+            "statut_global": "incomplet",
+            "nb_echecs_24h": 0,
+            "etapes_nuit_manquantes": ["sauvegarde_base", *CYCLE_NOCTURNE],
+            "echecs_recents": [],
+        }
+    raise ValueError(f"Simulation inconnue : « {mode} » (echec ou incomplet).")
+
+
 def executer_cycle() -> dict:
     """Enchaîne les tâches du cycle nocturne ; s'arrête à la première qui échoue."""
     etapes = []
@@ -296,7 +341,12 @@ def fabriquer_gestionnaire(jeton: str):
                 self._repondre(200, aujourdhui())
                 return
             if adresse.path == "/bilan":
-                resultat = bilan()
+                try:
+                    simuler = requete.get("simuler", [""])[0]
+                    resultat = bilan_simule(simuler) if simuler else bilan()
+                except ValueError as exc:
+                    self._repondre(400, {"erreur": str(exc)})
+                    return
                 if requete.get("connaissances", ["0"])[0] in ("1", "oui", "true"):
                     resultat.update(_connaissances_du_bilan(resultat))
                 self._repondre(200, resultat)

@@ -136,8 +136,13 @@ def question_depuis_bilan(bilan: dict) -> str:
     """Question construite à partir des pannes du bilan ; vide quand tout va bien."""
     if bilan.get("statut_global") == "succes":
         return ""
-    morceaux = [f"statut {bilan.get('statut_global', '')}"]
-    morceaux += [f"étape manquante {nom}" for nom in bilan.get("etapes_nuit_manquantes", [])]
+    statut = bilan.get("statut_global", "")
+    explication = {
+        "incomplet": "la nuit n'a pas tourné",
+        "echec": "une tâche a échoué",
+    }.get(statut, "")
+    morceaux = [f"statut {statut} {explication}".strip()]
+    morceaux += [f"étape manquante {nom}" for nom in bilan.get("etapes_nuit_manquantes", [])[:3]]
     for echec in bilan.get("echecs_recents", [])[:3]:
         morceaux.append(f"{echec.get('tache', '')} {str(echec.get('message', ''))[:120]}")
     return " ; ".join(morceaux)

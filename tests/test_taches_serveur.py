@@ -325,3 +325,11 @@ def test_bilan_avec_connaissances(adresse, bd_vierge):
     assert corps["statut_global"] == "incomplet"
     assert corps["connaissances"], "une nuit incomplète doit ramener des passages"
     assert "connaissances" not in appeler(adresse, "/bilan")[1]
+
+
+def test_bilan_simule_sans_base(adresse):
+    code, corps = appeler(adresse, "/bilan?simuler=echec&connaissances=1")
+    assert code == 200
+    assert corps["simulation"] is True and corps["statut_global"] == "echec"
+    assert any(p["section"] == "Tâche sauvegarde_base" for p in corps["connaissances"])
+    assert appeler(adresse, "/bilan?simuler=nimporte")[0] == 400

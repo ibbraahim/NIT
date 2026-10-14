@@ -289,3 +289,14 @@ par statut et par erreur connue). Workly la découpe par section et classe les p
 Dans le flux Agentic AI, l'unique changement est l'URL du composant « API Request » (ajouter
 `?connaissances=1`) et une phrase dans les instructions de l'Analyste : s'appuyer sur le champ
 `connaissances`, citer la section utilisée, écrire « cause inconnue dans la base » sinon.
+
+### Tester sans attendre la nuit
+
+Rien n'oblige à attendre 00:30 UTC pour vérifier la chaîne :
+
+- `POST /cycle-nocturne` (ou le bouton « Exécuter la tâche sélectionnée » de l'écran Tâches) lance
+  les étapes tout de suite ; le ▷ du flux Agentic AI et celui du nœud HTTP de Fusion aussi.
+- `GET /bilan?simuler=echec` ou `?simuler=incomplet` renvoie un bilan fictif (`"simulation": true`)
+  sans toucher à la base ; avec `&connaissances=1`, il ramène aussi les passages du RAG. C'est le
+  moyen de voir les agents réagir à une panne. Ne jamais laisser `simuler` dans le Cron de
+  production.

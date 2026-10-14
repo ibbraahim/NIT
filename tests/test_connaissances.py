@@ -65,3 +65,20 @@ def test_connaissances_du_bilan_cote_serveur():
     )
     assert resultat["connaissances"]
     assert serveur._connaissances_du_bilan({"statut_global": "succes"}) == {"connaissances": []}
+
+
+def test_bilan_simule():
+    import pytest
+
+    from app.taches import serveur
+
+    echec = serveur.bilan_simule("echec")
+    assert echec["simulation"] is True and echec["statut_global"] == "echec"
+    incomplet = serveur.bilan_simule("incomplet")
+    assert len(incomplet["etapes_nuit_manquantes"]) == 8
+    with pytest.raises(ValueError):
+        serveur.bilan_simule("autre")
+    titres = [p["section"] for p in connaissances.connaissances_pour_bilan(echec)]
+    assert "Tâche sauvegarde_base" in titres
+    titres = [p["section"] for p in connaissances.connaissances_pour_bilan(incomplet)]
+    assert "Statut incomplet : la nuit n'a pas tourné" in titres
